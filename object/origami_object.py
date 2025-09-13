@@ -1,11 +1,12 @@
-import numpy as np
+import torch
 from enum import Enum
 
 
 class Point:
-    def __init__(self, x: int, y: int, z: int) -> None:
-        self.position = np.array([x, y, z])
-        self.originalPosition = np.array([x, y, z])
+    def __init__(self, x: float, y: float, z: float) -> None:
+        self.position = torch.tensor([x, y, z], dtype=torch.float32)
+        self.originalPosition = torch.tensor([x, y, z], dtype=torch.float32)
+        self.force = torch.tensor([0, 0, 0], dtype=torch.float32)
 
     def __str__(self):
         return f"Point({self.position[0]}, {self.position[1]}, {self.position[2]})"
@@ -22,13 +23,13 @@ class LineType(Enum):
 
 
 class Line:
-    def __init__(self, p1: Point, p2: Point, lineType: LineType) -> None:
-        self.p1 = p1
-        self.p2 = p2
+    def __init__(self, p1Index: int, p2Index: int, lineType: LineType) -> None:
+        self.p1Index = p1Index
+        self.p2Index = p2Index
         self.lineType = lineType
 
     def __str__(self) -> str:
-        return f"Line({self.p1}, {self.p2})"
+        return f"Line({self.p1Index}, {self.p2Index}, {self.lineType})"
 
     def __repr__(self) -> str:
         return str(self)
@@ -46,20 +47,9 @@ class OrigamiObject:
             [] for _ in range(len(listPoints))
         ]  # tuple of (point index, line index)
         for line_index in range(len(listLines)):
-            p1, p2 = (
-                listLines[line_index].p1.originalPosition,
-                listLines[line_index].p2.originalPosition,
-            )
-            p1Index, p2Index = -1, -1
-            for point_index in range(len(listPoints)):
-                if listPoints[point_index].originalPosition.all() == p1.all():
-                    p1Index = point_index
-                if listPoints[point_index].originalPosition.all() == p2.all():
-                    p2Index = point_index
-                if p1Index == -1 or p2Index == -1:
-                    raise Exception("Point not found")
-                self.graph[p1Index].append((p2Index, line_index))
-                self.graph[p2Index].append((p1Index, line_index))
+            p1Index, p2Index = listLines[line_index].p1Index, listLines[line_index].p2Index
+            self.graph[p1Index].append((p2Index, line_index))
+            self.graph[p2Index].append((p1Index, line_index))
 
     def __str__(self) -> str:
         return f"OrigamiObject({self.listPoints}, {self.listLines})"
@@ -69,12 +59,12 @@ class OrigamiObject:
 
 
 if __name__ == "__main__":
-    listPoints = [Point(1, 2, 3), Point(4, 5, 6), Point(7, 8, 9), Point(10, 11, 12)]
+    listPoints = [Point(0,1,2), Point(4, 5, 6), Point(7, 8, 9), Point(10, 11, 12)]
     listLines = [
-        Line(listPoints[0], listPoints[1], LineType.MOUNTAIN),
-        Line(listPoints[1], listPoints[2], LineType.VALLEY),
-        Line(listPoints[2], listPoints[3], LineType.BORDER),
-        Line(listPoints[3], listPoints[0], LineType.FACET),
+        Line(0, 1, LineType.MOUNTAIN),
+        Line(1, 1, LineType.VALLEY),
+        Line(2, 3, LineType.BORDER),
+        Line(3, 0, LineType.FACET),
     ]
     o = OrigamiObject(listPoints, listLines)
     print(o)

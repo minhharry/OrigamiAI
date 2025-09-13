@@ -22,8 +22,8 @@ def show_origami_object(origami: OrigamiObject, show_points: bool = True) -> Non
 
     # Plot lines based on their type
     for line in origami.listLines:
-        p1 = line.p1.position
-        p2 = line.p2.position
+        p1 = origami.listPoints[line.p1Index].position
+        p2 = origami.listPoints[line.p2Index].position
         ax.plot(
             [p1[0], p2[0]],
             [p1[1], p2[1]],
@@ -74,8 +74,8 @@ def show_origami_object_2d(origami: OrigamiObject, show_points: bool = True) -> 
 
     # Plot lines based on their type, using x and z coordinates
     for line in origami.listLines:
-        p1 = line.p1.position
-        p2 = line.p2.position
+        p1 = origami.listPoints[line.p1Index].position
+        p2 = origami.listPoints[line.p2Index].position
         ax.plot(
             [p1[0], p2[0]],
             [p1[2], p2[2]],
