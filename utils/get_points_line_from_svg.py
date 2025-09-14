@@ -125,49 +125,10 @@ def break_lines(listPoints: list[Point], listLines: list[Line]) -> list[Line]:
 
 def get_points_line_from_svg(svg_file_path: str) -> tuple[list[Point], list[Line]]:
     root = lxml.etree.parse(svg_file_path).getroot()
-    listPoints, listLines = create_points_lines(root)
+    listPoints, listLines = create_points_lines(root) #get all points , include intersection points
+    listLines = break_lines(listPoints, listLines) # break lines if have point on line
+    triangulate_all(listPoints, listLines) # triangulate all polygon to facet lines
     return listPoints, listLines
-
-
-def draw_pattern(listPoints: list[Point], listLines: list[Line]):
-    fig, ax = plt.subplots()
-    for i, line in enumerate(listLines):
-        p1 = listPoints[line.p1Index].position
-        p2 = listPoints[line.p2Index].position
-
-        x_values = [p1[0].item(), p2[0].item()]  # x
-        y_values = [p1[2].item(), p2[2].item()]  # z (thay cho y)
-
-        if line.lineType.name == "MOUNTAIN":
-            color = "red"
-            linestyle = "--"
-        elif line.lineType.name == "VALLEY":
-            color = "blue"
-            linestyle = ":"
-        elif line.lineType.name == "BORDER":
-            color = "black"
-            linestyle = "-"
-        else:  # FACET
-            color = "gray"
-            linestyle = "-"
-
-        # Vẽ line
-        ax.plot(x_values, y_values, color=color, linestyle=linestyle)
-
-        # Đặt số ở giữa line
-        mid_x = (x_values[0] + x_values[1]) / 2
-        mid_y = (y_values[0] + y_values[1]) / 2
-        ax.text(mid_x, mid_y, str(i), color="green", fontsize=8)
-
-    # Vẽ point và đánh số
-    for j, point in enumerate(listPoints):
-        x, y = point.position[0].item(), point.position[2].item()
-        ax.scatter(x, y, color="black", s=10)  # chấm đen nhỏ
-        # ax.text(x + 1, y + 1, str(j), color="purple", fontsize=8)  # số hơi lệch để dễ nhìn
-
-    ax.set_aspect('equal', adjustable='box')
-    plt.gca().invert_yaxis()  # SVG gốc có trục y lộn ngược
-    plt.show()
 
 
  # Hàm để tính diện tích tam giác
@@ -284,11 +245,8 @@ def triangulate_all(listPoints: list[Point], listLines: list[Line]) -> list[Line
     return listLines   
 
 
+
 if __name__ == "__main__":
     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
     print("Points: ",len(listPoints))
-    listLines = break_lines(listPoints, listLines)
     print("Lines: ",len(listLines))
-    triangulate_all(listPoints, listLines)
-    print("After triangulate Lines: ",len(listLines))
-    draw_pattern(listPoints, listLines)

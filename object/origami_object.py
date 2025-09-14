@@ -34,15 +34,29 @@ class Line:
     def __repr__(self) -> str:
         return str(self)
 
+class Face:
+    def __init__(self, point1Index: Point, point2Index: Point, point3Index: Point) -> None:
+        self.point1Index = point1Index
+        self.point2Index = point2Index
+        self.point3Index = point3Index
+        self.normal = torch.tensor([0, 0, 0], dtype=torch.float32)
+
+    def __str__(self) -> str:
+        return f"Face({self.point1Index}, {self.point2Index}, {self.point3Index})"
+
+    def __repr__(self) -> str:
+        return str(self)
 
 class OrigamiObject:
     def __init__(
         self,
         listPoints: list[Point],
         listLines: list[Line],
+        listFaces: list[Face] = [],
     ) -> None:
         self.listPoints: list[Point] = listPoints  # list of points, order is not change
         self.listLines: list[Line] = listLines  # list of lines
+        self.listFaces: list[Face] = listFaces  # list of faces
         self.graph: list[list[tuple[int, int]]] = [
             [] for _ in range(len(listPoints))
         ]  # tuple of (point index, line index)
