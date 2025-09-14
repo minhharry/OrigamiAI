@@ -1,10 +1,10 @@
-import lxml
+import lxml.etree
 from object.origami_object import Point, Line, LineType
 from utils.snap_to_grid_svg import find_max_min
 import matplotlib.pyplot as plt
 from collections import defaultdict
 from math import atan2
-
+import torch
 
 IMAGE_PATH = "assets/flappingBird.svg"
 
@@ -25,8 +25,8 @@ def get_intersection_point(listPoints: list[Point],line1: Line, line2: Line) -> 
     px = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denom
     py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denom
 
-    if min(x1, x2) <= px <= max(x1, x2) and min(y1, y2) <= py <= max(y1, y2) and min(x3, x4) <= px <= max(x3, x4) and min(y3, y4) <= py <= max(y3, y4):
-        return Point(px, 0.0, py)
+    if torch.min(x1, x2) <= px <= torch.max(x1, x2) and torch.min(y1, y2) <= py <= torch.max(y1, y2) and torch.min(x3, x4) <= px <= torch.max(x3, x4) and torch.min(y3, y4) <= py <= torch.max(y3, y4):
+        return Point(float(px), 0.0, float(py))
     return None
 
 def is_point_exist(point: Point, listPoints: list[Point], pointMergeTolerance: float = 3.0) -> bool:
@@ -74,7 +74,7 @@ def get_type_line_from_svg(line) -> LineType:
     else:
         return LineType.FACET
 
-def create_points_lines(root) -> list[Point]:
+def create_points_lines(root) -> tuple[list[Point], list[Line]]:
     listPoints: list[Point] = []
     listLines: list[Line] = []
     for child in root:
@@ -130,8 +130,8 @@ def get_points_line_from_svg(svg_file_path: str) -> tuple[list[Point], list[Line
     triangulate_all(listPoints, listLines) # triangulate all polygon to facet lines
     return listPoints, listLines
 
+ 
 
- # Hàm để tính diện tích tam giác
 def build_adjacency(listPoints, listLines):
     """Tạo adjacency list, các neighbor được sắp CCW quanh mỗi điểm"""
     adj = defaultdict(list)

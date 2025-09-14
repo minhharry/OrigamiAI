@@ -35,7 +35,7 @@ class Line:
         return str(self)
 
 class Face:
-    def __init__(self, point1Index: Point, point2Index: Point, point3Index: Point) -> None:
+    def __init__(self, point1Index: int, point2Index: int, point3Index: int) -> None:
         self.point1Index = point1Index
         self.point2Index = point2Index
         self.point3Index = point3Index
@@ -46,6 +46,16 @@ class Face:
 
     def __repr__(self) -> str:
         return str(self)
+
+    def calculate_and_update_normal(self, listPoints: list[Point]) -> None:
+        p1 = listPoints[self.point1Index].position
+        p2 = listPoints[self.point2Index].position
+        p3 = listPoints[self.point3Index].position
+        v1 = p2 - p1
+        v2 = p3 - p1
+        normal = torch.cross(v1, v2)
+        normal = normal / torch.norm(normal)
+        self.normal = normal
 
 class OrigamiObject:
     def __init__(

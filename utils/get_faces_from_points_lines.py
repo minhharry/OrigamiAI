@@ -3,7 +3,6 @@ from object.origami_object import Point, Line, LineType, OrigamiObject, Face
 import torch
 
 def find_polygons(listPoints: list[Point], listLines: list[Line]) -> list[list[int]]:
-    # Xây graph kề
     graph = [[] for _ in range(len(listPoints))]
     edges = set()
     for line in listLines:
@@ -14,9 +13,7 @@ def find_polygons(listPoints: list[Point], listLines: list[Line]) -> list[list[i
 
     triangles = set()
 
-    # Duyệt từng cạnh và tìm tam giác
     for u, v in edges:
-        # giao các điểm kề của u và v
         neighbors_u = set(graph[u])
         neighbors_v = set(graph[v])
         common = neighbors_u.intersection(neighbors_v)
