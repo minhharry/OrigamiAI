@@ -18,6 +18,9 @@ def main2():
     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
     listFaces = get_faces_from_points_lines(listPoints, listLines)
     o = OrigamiObject(listPoints, listLines, listFaces)
+    print("points:", len(o.listPoints))
+    print("lines:", len(o.listLines))
+    print("faces:", len(o.listFaces))
     solver(o)
 
 

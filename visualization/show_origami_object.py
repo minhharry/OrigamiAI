@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 from object.origami_object import OrigamiObject, LineType
-
+from matplotlib.patches import Polygon as MplPolygon
+from matplotlib.collections import PatchCollection
+import numpy as np
 def show_origami_object(origami: OrigamiObject, show_points: bool = True) -> None:
     """
     Visualizes an OrigamiObject in 3D using matplotlib.
@@ -149,6 +151,80 @@ def show_origami_object_2d_new(origami: OrigamiObject, show_points: bool = True,
     ax.set_aspect('equal', adjustable='box')
     plt.gca().invert_yaxis()  # SVG gốc có trục y lộn ngược
     plt.show()
+
+def _point_xy(pt):
+    """Lấy (x, y) để vẽ từ Point (position = [x, y, z]) -> dùng x và z làm 2D coords."""
+    return (pt.position[0], pt.position[2])
+
+def draw_polygons(listPoints: list, polygons: list[list[int]],
+                  listLines: list = [],
+                  figsize=(8, 8),
+                  show_vertices: bool = True,
+                  annotate_indices: bool = False,
+                  fill_alpha: float = 0.25,
+                  edge_linewidth: float = 1.0,
+                  vertex_markersize: float = 6.0,
+                  cmap='tab20'):
+    """
+    Vẽ polygon lên matplotlib axes.
+
+    Args:
+        listPoints: danh sách Point (mỗi Point có .position [x,y,z]).
+        polygons: danh sách polygons, mỗi polygon là list các index của điểm.
+        listLines: (tuỳ chọn) danh sách Line để vẽ cạnh (Line có p1Index, p2Index).
+        figsize: kích thước figure.
+        show_vertices: vẽ các điểm (scatter) hay không.
+        annotate_indices: nếu True sẽ ghi index số lên mỗi điểm.
+        fill_alpha: độ trong suốt khi fill polygon.
+        edge_linewidth: độ dày viền polygon.
+        vertex_markersize: kích thước marker điểm.
+        cmap: tên colormap để phân biệt màu polygon.
+    Returns:
+        fig, ax
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    patches = []
+    colors = []
+    # tạo patches cho mỗi polygon
+    for i, poly in enumerate(polygons):
+        coords = [_point_xy(listPoints[idx]) for idx in poly]
+        # ensure the polygon is closed for plotting patch (matplotlib Polygon closes automatically)
+        patch = MplPolygon(coords, closed=True, linewidth=edge_linewidth)
+        patches.append(patch)
+        colors.append(i)  # dùng index làm color key (collection sẽ map sang cmap)
+
+    if patches:
+        pcollection = PatchCollection(patches, cmap=cmap, alpha=fill_alpha, edgecolor='black', linewidth=edge_linewidth)
+        pcollection.set_array(np.array(colors))
+        ax.add_collection(pcollection)
+
+    # vẽ các cạnh (nếu có listLines)
+    if listLines is not None:
+        for l in listLines:
+            p1 = listPoints[l.p1Index]
+            p2 = listPoints[l.p2Index]
+            x1, y1 = _point_xy(p1)
+            x2, y2 = _point_xy(p2)
+            ax.plot([x1, x2], [y1, y2], '-', linewidth=0.8, color='k', zorder=1)
+
+    # vẽ điểm (vertex) và annotate index
+    if show_vertices:
+        xs = [p.position[0] for p in listPoints]
+        ys = [p.position[2] for p in listPoints]
+        ax.scatter(xs, ys, s=vertex_markersize**2, zorder=3)
+        if annotate_indices:
+            for i, p in enumerate(listPoints):
+                ax.text(p.position[0], p.position[2], str(i),
+                        fontsize=8, color='black', zorder=4,
+                        ha='right', va='bottom')
+
+    ax.set_aspect('equal', 'box')
+    ax.invert_yaxis()  # nếu bạn muốn cùng hệ tọa độ với SVG (tuỳ file). Bỏ nếu không phù hợp.
+    ax.set_xlabel('x')
+    ax.set_ylabel('z')
+    ax.set_title(f'{len(polygons)} polygons, {len(listPoints)} points')
+    plt.tight_layout()
+    return fig, ax
 
 def show_faces_2d(origami_obj: OrigamiObject):
     """

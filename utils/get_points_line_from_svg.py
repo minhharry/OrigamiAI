@@ -1,10 +1,11 @@
 import lxml.etree
 from object.origami_object import Point, Line, LineType
-from utils.snap_to_grid_svg import find_max_min
-import matplotlib.pyplot as plt
 from collections import defaultdict
 from math import atan2
 import torch
+import numpy as np
+from scipy.spatial import Delaunay
+
 
 IMAGE_PATH = "assets/flappingBird.svg"
 
@@ -148,101 +149,68 @@ def build_adjacency(listPoints, listLines):
         ))
     return adj
 
-
-def segments_intersect(p1, p2, q1, q2):
-    """Kiểm tra 2 đoạn có cắt nhau (loại trừ trường hợp chung đỉnh)"""
-    def orient(a, b, c):
-        return (b.position[0] - a.position[0]) * (c.position[2] - a.position[2]) - \
-               (b.position[2] - a.position[2]) * (c.position[0] - a.position[0])
-    o1 = orient(p1, p2, q1)
-    o2 = orient(p1, p2, q2)
-    o3 = orient(q1, q2, p1)
-    o4 = orient(q1, q2, p2)
-    return o1 * o2 < 0 and o3 * o4 < 0
-
-
-def find_polygons(listPoints, listLines):
-    """Duyệt half-edge để tìm tất cả polygon"""
-    adj = build_adjacency(listPoints, listLines)
-    visited_half_edges = set()
-    polygons = []
-
-    for p in adj:
-        for q in adj[p]:
-            if (p, q) in visited_half_edges:
-                continue
-
-            polygon = [p]
-            cur, prev = q, p
-            while True:
-                polygon.append(cur)
-                visited_half_edges.add((prev, cur))
-                neighbors = adj[cur]
-                idx = neighbors.index(prev)
-                nxt = neighbors[(idx - 1) % len(neighbors)]  # quay CCW
-                prev, cur = cur, nxt
-                if cur == polygon[0]:
-                    break
-
-            if len(polygon) > 2:
-                m = min(polygon)
-                mi = polygon.index(m)
-                norm_poly = polygon[mi:] + polygon[:mi]
-                if norm_poly not in polygons:
-                    polygons.append(norm_poly)
-    return polygons
-
-
-def triangulate_polygon(polygon, listPoints, listLines, edges_set):
-    """Dùng ear clipping để chia polygon thành tam giác"""
+def do_segments_intersect(p1, p2, q1, q2) -> bool:
+    """Kiểm tra 2 đoạn thẳng (p1,p2) và (q1,q2) có cắt nhau không (trừ khi trùng endpoint)."""
     def ccw(a, b, c):
-        return (b.position[0] - a.position[0]) * (c.position[2] - a.position[2]) - \
-               (b.position[2] - a.position[2]) * (c.position[0] - a.position[0]) > 0
+        return (c[1]-a[1])*(b[0]-a[0]) > (b[1]-a[1])*(c[0]-a[0])
 
-    def is_valid_diagonal(i, j):
-        if (min(i, j), max(i, j)) in edges_set:
-            return False
-        pi, pj = listPoints[i], listPoints[j]
-        for k in range(len(polygon)):
-            a, b = polygon[k], polygon[(k + 1) % len(polygon)]
-            if len({i, j, a, b}) < 4:
-                continue
-            if segments_intersect(pi, pj, listPoints[a], listPoints[b]):
-                return False
-        return True
+    if (p1 == q1).all() or (p1 == q2).all() or (p2 == q1).all() or (p2 == q2).all():
+        return False  # chia sẻ endpoint thì không tính là giao cắt
 
-    poly = polygon[:]
-    while len(poly) > 3:
-        ear_found = False
-        for i in range(len(poly)):
-            prev_i = poly[(i - 1) % len(poly)]
-            curr_i = poly[i]
-            next_i = poly[(i + 1) % len(poly)]
-            a, b, c = listPoints[prev_i], listPoints[curr_i], listPoints[next_i]
+    return (ccw(p1, q1, q2) != ccw(p2, q1, q2)) and (ccw(p1, p2, q1) != ccw(p1, p2, q2))
 
-            if not ccw(a, b, c):
-                continue
-            if not is_valid_diagonal(prev_i, next_i):
-                continue
 
-            listLines.append(Line(prev_i, next_i, LineType.FACET))
-            edges_set.add((min(prev_i, next_i), max(prev_i, next_i)))
-            poly.pop(i)
-            ear_found = True
-            break
+def triangluate_poly(listPoints: list[Point], listLines: list[Line]) -> list[Line]:
+    """
+    Từ listPoints sinh ra thêm các cạnh FACET bằng Delaunay.
+    Không đè lên cạnh có sẵn và không cắt biên polygon.
+    """
 
-        if not ear_found:
-            break
-    return listLines
+    # chọn 2 chiều có biến thiên lớn nhất
+    arr = np.array([p.position.numpy() for p in listPoints])
+    ranges = arr.max(axis=0) - arr.min(axis=0)
+    idx = ranges.argsort()[-2:]
+    points_2d = arr[:, idx]
+
+    tri = Delaunay(points_2d)
+
+    # tập hợp cạnh từ simplex
+    edges = set()
+    for simplex in tri.simplices:
+        i, j, k = simplex
+        edges.add(tuple(sorted((i, j))))
+        edges.add(tuple(sorted((j, k))))
+        edges.add(tuple(sorted((k, i))))
+
+    # các cạnh có sẵn
+    existing_edges = {(min(l.p1Index, l.p2Index), max(l.p1Index, l.p2Index)) for l in listLines}
+    existing_segments = [(points_2d[i], points_2d[j]) for (i, j) in existing_edges]
+
+    new_lines = []
+    for i, j in edges:
+        if (i, j) in existing_edges:
+            continue  # bỏ qua cạnh đã có
+
+        pi, pj = points_2d[i], points_2d[j]
+
+        # kiểm tra cắt cạnh biên
+        intersects = False
+        for q1, q2 in existing_segments:
+            if do_segments_intersect(pi, pj, q1, q2):
+                intersects = True
+                break
+        if intersects:
+            continue
+        new_lines.append(Line(i, j, LineType.FACET))
+
+    return new_lines
 
 
 def triangulate_all(listPoints: list[Point], listLines: list[Line]) -> list[Line]:
-    """Triangulate toàn bộ polygons phát hiện được"""
-    edges_set = set((min(l.p1Index, l.p2Index), max(l.p1Index, l.p2Index)) for l in listLines)
-    polygons = find_polygons(listPoints, listLines)
-    for poly in polygons:
-        listLines = triangulate_polygon(poly, listPoints, listLines, edges_set)
-    return listLines   
+    listLines_ = triangluate_poly(listPoints, listLines)
+    for line in listLines_:
+        listLines.append(line)
+    return listLines 
 
 
 
