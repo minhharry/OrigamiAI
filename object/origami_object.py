@@ -1,20 +1,23 @@
 import torch
 from enum import Enum
 
-
 class Point:
     def __init__(self, x: float, y: float, z: float) -> None:
         self.position = torch.tensor([x, y, z], dtype=torch.float32)
         self.originalPosition = torch.tensor([x, y, z], dtype=torch.float32)
         self.force = torch.tensor([0, 0, 0], dtype=torch.float32)
+        self.verlocity = torch.tensor([0, 0, 0], dtype=torch.float32)
 
     def __str__(self):
         return f"Point({self.position[0]}, {self.position[1]}, {self.position[2]})"
 
     def __repr__(self) -> str:
         return str(self)
-
-
+    
+    def clear(self) -> None:
+        self.force = torch.tensor([0, 0, 0], dtype=torch.float32)
+        self.verlocity = torch.tensor([0, 0, 0], dtype=torch.float32)
+    
 class LineType(Enum):
     MOUNTAIN = 1
     VALLEY = 2
@@ -80,7 +83,19 @@ class OrigamiObject:
 
     def __repr__(self) -> str:
         return str(self)
-
+    
+    @classmethod
+    def getDistance(cls, point: Point, otherPoint: Point) -> torch.Tensor:
+        return torch.linalg.norm(point.position - otherPoint.position)
+    
+    @classmethod
+    def getOriginalDistance(cls, point: Point, otherPoint: Point) -> torch.Tensor:
+        return torch.linalg.norm(point.originalPosition - otherPoint.originalPosition)
+    
+    @classmethod
+    def getUnitVector(cls, point1: Point, point2: Point) -> torch.Tensor:
+        return (point2.position - point1.position) / torch.linalg.norm(point2.position - point1.position)
+    
 
 if __name__ == "__main__":
     listPoints = [Point(0,1,2), Point(4, 5, 6), Point(7, 8, 9), Point(10, 11, 12)]

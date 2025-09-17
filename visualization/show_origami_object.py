@@ -3,6 +3,24 @@ from object.origami_object import OrigamiObject, LineType
 from matplotlib.patches import Polygon as MplPolygon
 from matplotlib.collections import PatchCollection
 import numpy as np
+
+def set_axes_equal(ax):
+    """
+    Makes axes of a 3D plot have an equal scale, so that spheres appear as spheres,
+    and cubes as cubes.
+    """
+    limits = np.array([
+        ax.get_xlim3d(),
+        ax.get_ylim3d(),
+        ax.get_zlim3d(),
+    ])
+    origin = np.mean(limits, axis=1)
+    radius = 0.5 * np.max(np.abs(limits[:, 1] - limits[:, 0]))
+    ax.set_xlim3d([origin[0] - radius, origin[0] + radius])
+    ax.set_ylim3d([origin[1] - radius, origin[1] + radius])
+    ax.set_zlim3d([origin[2] - radius, origin[2] + radius])
+
+
 def show_origami_object(origami: OrigamiObject, show_points: bool = True) -> None:
     """
     Visualizes an OrigamiObject in 3D using matplotlib.
@@ -11,7 +29,7 @@ def show_origami_object(origami: OrigamiObject, show_points: bool = True) -> Non
         origami (OrigamiObject): The object to visualize.
         show_points (bool): Whether to plot individual points.
     """
-    fig = plt.figure()
+    fig = plt.figure(figsize=(16, 9))
     ax = fig.add_subplot(111, projection='3d')
 
     # Define colors for different line types
@@ -54,6 +72,8 @@ def show_origami_object(origami: OrigamiObject, show_points: bool = True) -> Non
     unique_handles = [handles[labels.index(label)] for label in unique_labels]
     ax.legend(unique_handles, unique_labels)
 
+    set_axes_equal(ax)
+    
     plt.show()
 
 def show_origami_object_2d(origami: OrigamiObject, show_points: bool = True) -> None:
@@ -66,7 +86,7 @@ def show_origami_object_2d(origami: OrigamiObject, show_points: bool = True) -> 
         origami (OrigamiObject): The object to visualize.
         show_points (bool): Whether to plot individual points.
     """
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(16, 9))
 
     # Define colors for different line types
     line_colors = {
@@ -111,7 +131,7 @@ def show_origami_object_2d(origami: OrigamiObject, show_points: bool = True) -> 
 
 def show_origami_object_2d_new(origami: OrigamiObject, show_points: bool = True, show_lines: bool = True) -> None:
     listPoints, listLines = origami.listPoints, origami.listLines
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(16, 9))
     for i, line in enumerate(listLines):
         p1 = listPoints[line.p1Index].position
         p2 = listPoints[line.p2Index].position
@@ -233,7 +253,7 @@ def show_faces_2d(origami_obj: OrigamiObject):
     listPoints = origami_obj.listPoints
     listFaces = origami_obj.listFaces
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(16, 9))
 
     for i, face in enumerate(listFaces):
         # Lấy tọa độ 3 điểm
