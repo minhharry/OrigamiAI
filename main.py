@@ -7,7 +7,7 @@ from visualization.animate import show_origami_object_open3d
 import torch
 
 def main():
-    IMAGE_PATH = "assets/flappingBird.svg"
+    IMAGE_PATH = "assets/M.svg"
     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
     listFaces = get_faces_from_points_lines(listPoints, listLines)
     o = OrigamiObject(listPoints, listLines, listFaces)
@@ -16,7 +16,7 @@ def main():
     show_faces_2d(o)
 
 def main2():
-    IMAGE_PATH = "assets/flappingBird.svg"
+    IMAGE_PATH = "assets/M.svg"
     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
     listFaces = get_faces_from_points_lines(listPoints, listLines)
     o = OrigamiObject(listPoints, listLines, listFaces)
@@ -34,7 +34,7 @@ def main2():
     show_origami_object(o)
 
 def main3():
-    IMAGE_PATH = "assets/flappingBird.svg"
+    IMAGE_PATH = "assets/M.svg"
     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
     listFaces = get_faces_from_points_lines(listPoints, listLines)
     o = OrigamiObject(listPoints, listLines, listFaces)
