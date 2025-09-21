@@ -5,7 +5,7 @@ from math import atan2
 import torch
 import numpy as np
 from scipy.spatial import Delaunay
-
+import math
 
 IMAGE_PATH = "assets/flappingBird.svg"
 
@@ -66,9 +66,9 @@ def is_on_line(point: Point, line: Line, listPoints: list[Point], pointMergeTole
     return True
 
 def get_type_line_from_svg(line) -> LineType:
-    if line.attrib.get('stroke') == '#FF0000':
+    if line.attrib.get('stroke') == '#FF0000' or line.attrib.get('stroke') == '#ff0000':
         return LineType.MOUNTAIN
-    elif line.attrib.get('stroke') == '#0000FF':
+    elif line.attrib.get('stroke') == '#0000FF' or line.attrib.get('stroke') == '#0000ff':
         return LineType.VALLEY
     elif line.attrib.get('stroke') == '#000000':
         return LineType.BORDER
@@ -97,7 +97,13 @@ def create_points_lines(root) -> tuple[list[Point], list[Line]]:
                 listPoints.append(tempPoint2)
             index1 = find_point_index(tempPoint1, listPoints)
             index2 = find_point_index(tempPoint2, listPoints)
-            listLines.append(Line(index1, index2, get_type_line_from_svg(child)))
+            opacity = 1.0
+            if child.attrib.get('opacity'):
+                opacity = float(child.attrib.get('opacity')) 
+            elif child.attrib.get('stroke-opacity'):
+                opacity= float(child.attrib.get('stroke-opacity'))
+            targetTheta = -opacity*math.pi if (get_type_line_from_svg(child)==LineType.MOUNTAIN) else opacity*math.pi
+            listLines.append(Line(index1, index2, get_type_line_from_svg(child),targetTheta))
         for i in range(len(listLines)):
             for j in range(i+1, len(listLines)):
                 intersectionPoint = get_intersection_point(listPoints,listLines[i], listLines[j])
@@ -112,8 +118,8 @@ def break_lines(listPoints: list[Point], listLines: list[Line]) -> list[Line]:
         for i, point in enumerate(listPoints):
             if is_on_line(point, line, listPoints):
                 if i != line.p1Index and i != line.p2Index:
-                    newLine1 = Line(line.p1Index, i, line.lineType)
-                    newLine2 = Line(i, line.p2Index, line.lineType)
+                    newLine1 = Line(line.p1Index, i, line.lineType,line.targetTheta)
+                    newLine2 = Line(i, line.p2Index, line.lineType,line.targetTheta)
                     if not is_line_exist(newLine1, listLines):
                         listLines.append(newLine1)
                     if not is_line_exist(newLine2, listLines):
@@ -202,7 +208,7 @@ def triangluate_poly(listPoints: list[Point], listLines: list[Line]) -> list[Lin
                 break
         if intersects:
             continue
-        new_lines.append(Line(i, j, LineType.FACET))
+        new_lines.append(Line(i, j, LineType.FACET,0.0))
 
     return new_lines
 

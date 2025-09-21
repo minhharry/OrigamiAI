@@ -29,7 +29,7 @@ def show_origami_object(origami: OrigamiObject, show_points: bool = True) -> Non
         origami (OrigamiObject): The object to visualize.
         show_points (bool): Whether to plot individual points.
     """
-    fig = plt.figure(figsize=(16, 9))
+    fig = plt.figure(figsize=(10, 7))
     ax = fig.add_subplot(111, projection='3d')
 
     # Define colors for different line types
@@ -86,7 +86,7 @@ def show_origami_object_2d(origami: OrigamiObject, show_points: bool = True) -> 
         origami (OrigamiObject): The object to visualize.
         show_points (bool): Whether to plot individual points.
     """
-    fig, ax = plt.subplots(figsize=(16, 9))
+    fig, ax = plt.subplots(figsize=(8, 6))
 
     # Define colors for different line types
     line_colors = {
@@ -131,7 +131,7 @@ def show_origami_object_2d(origami: OrigamiObject, show_points: bool = True) -> 
 
 def show_origami_object_2d_new(origami: OrigamiObject, show_points: bool = True, show_lines: bool = True) -> None:
     listPoints, listLines = origami.listPoints, origami.listLines
-    fig, ax = plt.subplots(figsize=(16, 9))
+    fig, ax = plt.subplots(figsize=(8, 6))
     for i, line in enumerate(listLines):
         p1 = listPoints[line.p1Index].position
         p2 = listPoints[line.p2Index].position
@@ -253,7 +253,7 @@ def show_faces_2d(origami_obj: OrigamiObject):
     listPoints = origami_obj.listPoints
     listFaces = origami_obj.listFaces
 
-    fig, ax = plt.subplots(figsize=(16, 9))
+    fig, ax = plt.subplots(figsize=(8, 6))
 
     for i, face in enumerate(listFaces):
         # Lấy tọa độ 3 điểm
@@ -269,7 +269,7 @@ def show_faces_2d(origami_obj: OrigamiObject):
         ]
 
         # Vẽ tam giác (fill + border)
-        ax.fill(xs, ys, alpha=0.3, label=f"Face {i}")
+        ax.fill(xs, ys, alpha=0.3)
         ax.plot(xs + [xs[0]], ys + [ys[0]], color="black")
 
     # Vẽ point

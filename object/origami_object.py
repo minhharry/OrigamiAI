@@ -1,4 +1,5 @@
 import torch
+import math
 from enum import Enum
 
 class Point:
@@ -26,16 +27,24 @@ class LineType(Enum):
 
 
 class Line:
-    def __init__(self, p1Index: int, p2Index: int, lineType: LineType) -> None:
+    def __init__(self, p1Index: int, p2Index: int, lineType: LineType, targetTheta: float = 0) -> None:
         self.p1Index = p1Index
         self.p2Index = p2Index
         self.lineType = lineType
+        self.targetTheta = targetTheta
+        self.currentTheta = 0.0
 
     def __str__(self) -> str:
-        return f"Line({self.p1Index}, {self.p2Index}, {self.lineType})"
+        return f"Line({self.p1Index}, {self.p2Index}, {self.lineType},{self.targetTheta},{self.currentTheta} )"
 
     def __repr__(self) -> str:
         return str(self)
+
+    def get_line_original_length(self,listPoints: list[Point])->float:
+        return torch.linalg.norm(listPoints[self.p1Index].originalPosition-listPoints[self.p2Index].originalPosition)
+    def get_line_length(self,listPoints: list[Point])->float:
+        return torch.linalg.norm(listPoints[self.p1Index].position-listPoints[self.p2Index].position)
+    
 
 class Face:
     def __init__(self, point1Index: int, point2Index: int, point3Index: int) -> None:
@@ -58,15 +67,17 @@ class Face:
     def __repr__(self) -> str:
         return str(self)
 
-    def calculate_and_update_normal(self, listPoints: list[Point]) -> None:
+    def calculate_and_update_normal(self, listPoints: list[Point]) -> torch.Tensor:
         p1 = listPoints[self.point1Index].position
         p2 = listPoints[self.point2Index].position
         p3 = listPoints[self.point3Index].position
         v1 = p2 - p1
         v2 = p3 - p1
+
         normal = torch.linalg.cross(v1, v2)
         normal = normal / torch.linalg.norm(normal)
         self.normal = normal
+        return normal
 
     def calculate_and_update_line_index(self, listLines: list[Line]) -> None:
         def find_line_index(p1Index: int, p2Index: int) -> int:
@@ -79,24 +90,7 @@ class Face:
         self.line12Index = find_line_index(self.point1Index, self.point2Index)
         self.line23Index = find_line_index(self.point2Index, self.point3Index)
         self.line13Index = find_line_index(self.point1Index, self.point3Index)
-
-    def calculate_face_angles(self, p1: Point, p2: Point, p3: Point) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        a = p1.position
-        b = p2.position
-        c = p3.position
-        def angle(u, v):
-            cos_theta = torch.dot(u, v) / (torch.norm(u) * torch.norm(v))
-            cos_theta = torch.clamp(cos_theta, -1.0, 1.0)
-            return torch.acos(cos_theta)
-        
-        ab, ac = b - a, c - a
-        ba, bc = a - b, c - b
-        ca, cb = a - c, b - c
-        
-        angle_A = angle(ab, ac)
-        angle_B = angle(ba, bc)
-        angle_C = angle(ca, cb)
-        return angle_A, angle_B, angle_C
+    
 
 class OrigamiObject:
     def __init__(
@@ -119,10 +113,28 @@ class OrigamiObject:
         # Calculate face original angles
         for face in listFaces:
             face.alpha1, face.alpha2, face.alpha3 = \
-                face.calculate_face_angles(listPoints[face.point1Index], listPoints[face.point2Index], listPoints[face.point3Index])
+                OrigamiObject.calculate_face_angles(
+                    listPoints[face.point1Index], listPoints[face.point2Index], listPoints[face.point3Index]
+                    )
             
             face.calculate_and_update_line_index(listLines)
-
+        #Create list mapping LineIndex to List Face index
+        self.mappingLineToFace: dict[int, list[int]] = {} #index cạnh
+        for face_index in range(len(self.listFaces)):
+            face = self.listFaces[face_index]
+            if self.mappingLineToFace.get(face.line12Index) is None:
+                self.mappingLineToFace[face.line12Index] = []
+            if self.mappingLineToFace.get(face.line23Index) is None:
+                self.mappingLineToFace[face.line23Index] = []
+            if self.mappingLineToFace.get(face.line13Index) is None:
+                self.mappingLineToFace[face.line13Index] = []
+            self.mappingLineToFace[face.line12Index].append(face_index)
+            self.mappingLineToFace[face.line23Index].append(face_index)
+            self.mappingLineToFace[face.line13Index].append(face_index)
+       
+        for line_index in range(len(self.listLines)):
+            listLines[line_index].currentTheta = self.calculate_theta(line_index)
+      
     def __str__(self) -> str:
         return f"OrigamiObject({self.listPoints}, {self.listLines})"
 
@@ -142,13 +154,57 @@ class OrigamiObject:
         return (point2.position - point1.position) / torch.linalg.norm(point2.position - point1.position)
     
     @classmethod
-    def distance_point_to_line(cls, point: Point, line: Line, points: list[Point]) -> torch.Tensor:
+    def calculate_distance_point_to_line(cls, point: Point, line: Line, points: list[Point]) -> torch.Tensor:
         A = points[line.p1Index].position
         B = points[line.p2Index].position
         P = point.position
         numerator = torch.norm(torch.linalg.cross(P - A, P - B))
         denominator = torch.norm(B - A)
         return numerator / denominator
+
+    @classmethod
+    def calculate_distance_point_to_line_2(cls, point: Point, line_point_1: Point, line_point_2: Point) -> torch.Tensor:
+        A = line_point_1.position
+        B = line_point_2.position
+        P = point.position
+        numerator = torch.norm(torch.linalg.cross(P - A, P - B))
+        denominator = torch.norm(B - A)
+        return numerator / denominator
+
+    
+    def calculate_theta(self, lineIndex)->float:
+        if(len(self.mappingLineToFace[lineIndex])!=2): return 0
+        face1 = self.listFaces[self.mappingLineToFace[lineIndex][0]]
+        face2 = self.listFaces[self.mappingLineToFace[lineIndex][1]]
+        n1 = face1.calculate_and_update_normal(self.listPoints)
+        n2 = face2.calculate_and_update_normal(self.listPoints)
+        dot = torch.dot(n1, n2).clamp(-1.0, 1.0)  
+        alpha = torch.acos(dot).item()
+        # if(alpha > math.pi):
+        #     alpha = alpha - math.pi*2
+        # if(self.listLines[lineIndex].lineType==LineType.MOUNTAIN): alpha=-abs(alpha)
+        return alpha
+    
+    @classmethod
+    def calculate_face_angles(cls, p1: Point, p2: Point, p3: Point) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        a = p1.position
+        b = p2.position
+        c = p3.position
+        def angle(u, v):
+            cos_theta = torch.dot(u, v) / (torch.norm(u) * torch.norm(v))
+            cos_theta = torch.clamp(cos_theta, -1.0, 1.0)
+            return torch.acos(cos_theta)
+        ab, ac = b - a, c - a
+        ba, bc = a - b, c - b
+        ca, cb = a - c, b - c
+        
+        angle_A = angle(ab, ac)
+        angle_B = angle(ba, bc)
+        angle_C = angle(ca, cb)
+        return angle_A, angle_B, angle_C
+    
+
+
     
 
 if __name__ == "__main__":
@@ -163,7 +219,3 @@ if __name__ == "__main__":
     print(o)
     print(o.graph)
     print(LineType.MOUNTAIN)
-
-    listPoints2 = [Point(0,3,0), Point(4,0,0), Point(0,0,0)]
-    face = Face(0, 1, 2)
-    print(face.calculate_face_angles(listPoints2[0], listPoints2[1], listPoints2[2]))
