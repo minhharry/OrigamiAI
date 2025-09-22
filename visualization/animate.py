@@ -114,19 +114,37 @@ def show_origami_object_open3d(
             vis.update_renderer()
     finally:
         vis.destroy_window()
+import time
+import numpy as np
+import open3d as o3d
+from typing import Callable
 
 def show_origami_object_open3d_new(
-    origami: OrigamiObject,
-    solverstep: Callable[[OrigamiObject], None],
+    origami,
+    solverstep: Callable[[object],Optional[OrigamiObject] ],
     fps: int = 30,
     show_points: bool = True,
     show_faces: bool = True,
     show_forces: bool = True,
+    show_normals: bool = True,
     force_scale: float = 0.1,
+    point_scale: float = 10.0,
+    normal_scale: float = 0.2,
     window_name: str = "Origami Viewer"
 ) -> None:
     vis = o3d.visualization.Visualizer()
     vis.create_window(window_name=window_name)
+
+    # --- render options ---
+    render_option = vis.get_render_option()
+    render_option.point_size = point_scale
+
+    def _pts_to_np(points):
+        return np.array([[p.position[0].item(),
+                          p.position[1].item(),
+                          p.position[2].item()] for p in points],
+                        dtype=np.float64)
+
     pts = _pts_to_np(origami.listPoints)
 
     # --- point cloud ---
@@ -143,6 +161,12 @@ def show_origami_object_open3d_new(
     if show_forces:
         force_lines = o3d.geometry.LineSet()
         vis.add_geometry(force_lines)
+
+    # --- normals as arrows ---
+    normal_lines = None
+    if show_normals:
+        normal_lines = o3d.geometry.LineSet()
+        vis.add_geometry(normal_lines)
 
     # --- line setup ---
     line_color_map = {
@@ -163,9 +187,17 @@ def show_origami_object_open3d_new(
             dtype=np.int32
         )
         mesh.triangles = o3d.utility.Vector3iVector(triangles)
-        mesh.compute_triangle_normals()
-        mesh.compute_vertex_normals()
+        mesh.compute_triangle_normals(normalized=True)
+        mesh.compute_vertex_normals(normalized=True)
         vis.add_geometry(mesh)
+
+        # --- auto camera adjust for [-1,1] ---
+        view_ctl = vis.get_view_control()
+        bounds = mesh.get_axis_aligned_bounding_box()
+        view_ctl.set_lookat(bounds.get_center())
+        view_ctl.set_up([0, 1, 0])
+        view_ctl.set_front([0, 0, -1])
+        view_ctl.set_zoom(0.8)
 
     target_dt = 1.0 / max(1, fps)
     last_time = time.perf_counter()
@@ -196,19 +228,20 @@ def show_origami_object_open3d_new(
 
             # --- update forces ---
             if show_forces and force_lines is not None:
-                force_pts = []
-                force_edges = []
-                force_colors = []
-
+                force_pts, force_edges, force_colors = [], [], []
                 for i, p in enumerate(origami.listPoints):
-                    ppos = np.array([p.position[0].item(), p.position[1].item(), p.position[2].item()])
-                    fvec = np.array([p.force[0].item(), p.force[1].item(), p.force[2].item()]) * force_scale
+                    ppos = np.array([p.position[0].item(),
+                                     p.position[1].item(),
+                                     p.position[2].item()])
+                    fvec = np.array([p.force[0].item(),
+                                     p.force[1].item(),
+                                     p.force[2].item()]) * force_scale
                     if np.linalg.norm(fvec) > 1e-9:
                         start_idx = len(force_pts)
                         force_pts.append(ppos)
                         force_pts.append(ppos + fvec)
                         force_edges.append([start_idx, start_idx + 1])
-                        force_colors.append([0.0, 1.0, 0.0])  # green for forces
+                        force_colors.append([0.0, 1.0, 0.0])  # green
 
                 if force_pts:
                     force_lines.points = o3d.utility.Vector3dVector(np.array(force_pts))
@@ -242,7 +275,7 @@ def show_origami_object_open3d_new(
                         )
                         vis.update_geometry(ls)
 
-            # --- update faces ---
+            # --- update faces + normals ---
             if show_faces:
                 if origami.listFaces:
                     if mesh is None:
@@ -254,9 +287,32 @@ def show_origami_object_open3d_new(
                         dtype=np.int32
                     )
                     mesh.triangles = o3d.utility.Vector3iVector(tris)
-                    mesh.compute_triangle_normals()
-                    mesh.compute_vertex_normals()
+                    mesh.compute_triangle_normals(normalized=True)
+                    mesh.compute_vertex_normals(normalized=True)
                     vis.update_geometry(mesh)
+
+                    if show_normals and normal_lines is not None:
+                        n_pts, n_edges, n_colors = [], [], []
+                        for f in origami.listFaces:
+                            tri = np.array([pts[f.point1Index],
+                                            pts[f.point2Index],
+                                            pts[f.point3Index]])
+                            centroid = tri.mean(axis=0)
+                            # use mesh normals
+                            normal = np.cross(tri[1] - tri[0], tri[2] - tri[0])
+                            if np.linalg.norm(normal) > 1e-9:
+                                normal /= np.linalg.norm(normal)
+                            start_idx = len(n_pts)
+                            n_pts.append(centroid)
+                            n_pts.append(centroid + normal * normal_scale)
+                            n_edges.append([start_idx, start_idx + 1])
+                            n_colors.append([1.0, 0.5, 0.0])  # orange for normals
+                        if n_pts:
+                            normal_lines.points = o3d.utility.Vector3dVector(np.array(n_pts))
+                            normal_lines.lines = o3d.utility.Vector2iVector(np.array(n_edges, dtype=np.int32))
+                            normal_lines.colors = o3d.utility.Vector3dVector(np.array(n_colors))
+                            vis.update_geometry(normal_lines)
+
                 else:
                     if mesh is not None:
                         vis.remove_geometry(mesh)

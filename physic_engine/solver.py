@@ -11,7 +11,7 @@ import math
 
 EA = 20.0
 POINT_MASS = 1.0 # Mass of point
-DT = 0.3 # Delta time
+DT = 0.03 # Delta time
 
 K_FOLD = 0.7
 K_FACET = 0.7
@@ -19,7 +19,7 @@ K_FACET = 0.7
 K_FACE = 0.2
 
 
-DAMPING_RATIO = 0.1
+DAMPING_RATIO = 0.45
 
 def clear(objectOrigami: OrigamiObject) -> None:
     # Clear previous step forces and verlocities
@@ -35,7 +35,6 @@ def addAxialConstraintsForce(objectOrigami: OrigamiObject) -> None:
         force = EA/l0 * (OrigamiObject.getDistance(p1, p2) - OrigamiObject.getOriginalDistance(p1, p2))
         unitVector = OrigamiObject.getUnitVector(p1, p2)
         force = force * unitVector
-
         p1.force += force
         p2.force -= force
     return
@@ -48,72 +47,51 @@ def addCreaseConstraintsForce(objectOrigami: OrigamiObject) -> None:
         if len(faceIndices)!=2: continue
         if len(faceIndices)==0 or len(faceIndices)>=3: raise ValueError(f"len(faceIndices) {len(faceIndices)} is not 1 or 2")
         
-        K_CREASE = 0
-        if (objectOrigami.listLines[lineIndex].lineType == LineType.MOUNTAIN or
-            objectOrigami.listLines[lineIndex].lineType == LineType.VALLEY 
+        K_CREASE = 0.0
+        if (
+            objectOrigami.listLines[lineIndex].lineType == LineType.MOUNTAIN 
+            or
+              objectOrigami.listLines[lineIndex].lineType == LineType.VALLEY 
             ):
             l0 = objectOrigami.listLines[lineIndex].get_line_original_length(objectOrigami.listPoints)
             K_CREASE = l0*K_FOLD
         elif (objectOrigami.listLines[lineIndex].lineType==LineType.FACET):
             l0 = objectOrigami.listLines[lineIndex].get_line_original_length(objectOrigami.listPoints)
             K_CREASE = l0*K_FACET
-     
-        theta = objectOrigami.calculate_theta(lineIndex)
-        target_theta = objectOrigami.listLines[lineIndex].targetTheta
+
         
-        force = -K_CREASE*(theta-target_theta)
         p3_index =objectOrigami.listLines[lineIndex].p1Index
-       
         p4_index =objectOrigami.listLines[lineIndex].p2Index
 
-        face1 = objectOrigami.listFaces[objectOrigami.mappingLineToFace[lineIndex][0]]
-        face2 = objectOrigami.listFaces[objectOrigami.mappingLineToFace[lineIndex][1]]
 
         p3 = objectOrigami.listPoints[p3_index]
         p4 = objectOrigami.listPoints[p4_index]
-        p1, p2 = p3, p3 
-        #p4 p2 p3
-        #p2 p3 p4
-        #p3 p4 p2
-        # p3, p4, p1 
 
-        if face1.point1Index == p3_index:
-            if face1.point2Index == p4_index:
-                p2 = objectOrigami.listPoints[face1.point3Index]
-            else:
-                p2 = objectOrigami.listPoints[face1.point2Index]
-        elif face1.point2Index == p3_index:
-            if face1.point1Index == p4_index:
-                p2 = objectOrigami.listPoints[face1.point3Index]
-            else:
-                p2 = objectOrigami.listPoints[face1.point1Index]
-        elif face1.point3Index == p3_index:
-            if face1.point1Index == p4_index:
-                p2 = objectOrigami.listPoints[face1.point2Index]
-            else:
-                p2 = objectOrigami.listPoints[face1.point1Index]
+        face1_temp = objectOrigami.listFaces[objectOrigami.mappingLineToFace[lineIndex][0]]
+        face2_temp = objectOrigami.listFaces[objectOrigami.mappingLineToFace[lineIndex][1]]
+        face1, face2 = face1_temp, face2_temp
+        valid_direction_p34 = [[face2_temp.point1Index,face2_temp.point2Index],[face2_temp.point2Index,face2_temp.point3Index],[face2_temp.point3Index,face2_temp.point1Index]]
+        
+        if not [p3_index,p4_index] in valid_direction_p34:
+            face1 = face2_temp
+            face2 = face1_temp
 
-        #p3 p1 p4
-        #p4 p3 p1
-        #p1 p4 p3
-        if face2.point1Index == p3_index:
-            if face2.point2Index == p4_index:
-                p1 = objectOrigami.listPoints[face2.point3Index]
-            else:
-                p1 = objectOrigami.listPoints[face2.point2Index]
-        elif face2.point2Index == p3_index:
-            if face2.point1Index == p4_index:
-                p1 = objectOrigami.listPoints[face2.point3Index]
-            else:
-                p1 = objectOrigami.listPoints[face2.point1Index]
-        elif face2.point3Index == p3_index:
-            if face2.point1Index == p4_index:
-                p1 = objectOrigami.listPoints[face2.point2Index]
-            else:
-                p1 = objectOrigami.listPoints[face2.point1Index]
+        face1_indices = {face1.point1Index, face1.point2Index, face1.point3Index}
+        crease_indices = {p3_index, p4_index}
+        p1_index = (face1_indices - crease_indices).pop() 
+        face2_indices = {face2.point1Index, face2.point2Index, face2.point3Index}
+        p2_index = (face2_indices - crease_indices).pop() 
+        p1 = objectOrigami.listPoints[p1_index]
+        p2 = objectOrigami.listPoints[p2_index]
+       
       
-        n1 = face2.calculate_and_update_normal(objectOrigami.listPoints)
-        n2 = face1.calculate_and_update_normal(objectOrigami.listPoints)
+        theta = objectOrigami.calculate_theta(lineIndex,p3,p4,face1,face2)
+
+        target_theta = objectOrigami.listLines[lineIndex].targetTheta
+        force = -K_CREASE*(theta-target_theta)
+
+        n1 = face1.calculate_and_update_normal(objectOrigami.listPoints)
+        n2 = face2.calculate_and_update_normal(objectOrigami.listPoints)
         h1 = OrigamiObject.calculate_distance_point_to_line_2(p1,p3,p4)
         h2 = OrigamiObject.calculate_distance_point_to_line_2(p2,p3,p4)
         alpha_4_31, alpha_3_14, alpha_1_43 = OrigamiObject.calculate_face_angles(p4,p3,p1)
@@ -126,7 +104,12 @@ def addCreaseConstraintsForce(objectOrigami: OrigamiObject) -> None:
 
         p1.force += force*n1/h1
         p2.force += force*n2/h2
-       
+
+        if 3 in [p2_index,p1_index,p3_index,p4_index]:
+            print("o1_index: ",p1_index," p2_index: ",p2_index," p3_index: ",p3_index," p4_index: ",p4_index," line_index: ",lineIndex)
+            print("Theta: ",theta," targetTheta: ",target_theta)
+            print("force: ",force," n1: ",n1," n2: ",n2," h1: ",h1," h2: ",h2," p1: ",p1.position.tolist()," p2: ",p2.position.tolist()," p3: ",p3.position.tolist()," p4: ",p4.position.tolist())
+            print("P2_FORCE: ",p2.force)
         p3.force += force*(-cot_4_31/(cot_4_31+cot_3_14)*n1/h1-cot_4_23/(cot_4_23+cot_3_42)*n2/h2)
         p4.force += force*(-cot_3_14/(cot_4_31+cot_3_14)*n1/h1-cot_3_42/(cot_4_23+cot_3_42)*n2/h2)
    
@@ -135,8 +118,8 @@ def addCreaseConstraintsForce(objectOrigami: OrigamiObject) -> None:
 def addFaceConstraintsForce(objectOrigami: OrigamiObject) -> None:
     def calculateUnitVectorForce(face: Face, p1: Point, p2: Point, p3: Point) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # Calculate at point p2
-        delta_p1 = torch.linalg.cross(face.normal, (p1.position - p2.position)) / torch.linalg.norm(p1.position - p2.position)
-        delta_p3 = torch.linalg.cross(face.normal, (p2.position - p3.position)) / torch.linalg.norm(p2.position - p3.position)
+        delta_p1 = torch.linalg.cross(face.normal, (p1.position - p2.position)) / (torch.linalg.norm(p1.position - p2.position)** 2)
+        delta_p3 = -torch.linalg.cross(face.normal, (p3.position - p2.position)) / (torch.linalg.norm(p2.position - p3.position)** 2)
         delta_p2 = - delta_p1 - delta_p3 
         return delta_p1, delta_p2, delta_p3
     
@@ -184,15 +167,25 @@ def addDampingForce(objectOrigami: OrigamiObject) -> None:
     return
 
 def calculateNewPositions(objectOrigami: OrigamiObject) -> None:
-    for point in objectOrigami.listPoints:
+    for index,point in enumerate(objectOrigami.listPoints):
+        if index == 3:
+            print("total: ",point.force)
         a = point.force / POINT_MASS
-        point.position += a * DT * DT
+        point.verlocity += a * DT
+        point.position += point.verlocity * DT
     return
+
 
 def solverStep(objectOrigami: OrigamiObject) -> None:
     clear(objectOrigami)
     addAxialConstraintsForce(objectOrigami)  # co van de
+    for index in range(len(objectOrigami.listPoints)):
+        if index == 3:
+            print("init force: ",objectOrigami.listPoints[index].force)
     addCreaseConstraintsForce(objectOrigami) # Bi fail do facet gap qua nhieu
+    for index in range(len(objectOrigami.listPoints)):
+        if index == 3:
+            print("after crease force: ",objectOrigami.listPoints[index].force)
     addFaceConstraintsForce(objectOrigami)
 
     calculateVelocities(objectOrigami)
