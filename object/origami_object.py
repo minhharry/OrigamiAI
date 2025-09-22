@@ -17,7 +17,6 @@ class Point:
     
     def clear(self) -> None:
         self.force = torch.tensor([0, 0, 0], dtype=torch.float32)
-        # self.verlocity = torch.tensor([0, 0, 0], dtype=torch.float32)
     
 class LineType(Enum):
     MOUNTAIN = 1
@@ -92,7 +91,6 @@ class Face:
         self.line23Index = find_line_index(self.point2Index, self.point3Index)
         self.line13Index = find_line_index(self.point1Index, self.point3Index)
     
-
 class OrigamiObject:
     def __init__(
         self,
@@ -114,16 +112,15 @@ class OrigamiObject:
             min_position_y = min(point.originalPosition.tolist()[2],min_position_y)
             max_position_y = max(point.originalPosition.tolist()[2],max_position_y)
             
-    
+        #Doan nay thenm vo khong thay cai hinh luon
+        for point in listPoints:
+            x_ = a + (point.originalPosition.tolist()[0]-min_position_x)*(b-a)/(max_position_x-min_position_x)
+            z_ = a + (point.originalPosition.tolist()[2]-min_position_y)*(b-a)/(max_position_y-min_position_y)
+            point.originalPosition = torch.tensor([x_,0.0,z_])
+            point.position = point.originalPosition.clone()
 
-        # for point in listPoints:
-        #     x_ = a + (point.originalPosition.tolist()[0]-min_position_x)*(b-a)/(max_position_x-min_position_x)
-        #     z_ = a + (point.originalPosition.tolist()[2]-min_position_y)*(b-a)/(max_position_y-min_position_y)
-        #     point.originalPosition = torch.tensor([x_,0.0,z_])
-        #     point.position = point.originalPosition.clone()
-
-        self.listLines: list[Line] = listLines  # list of lines
-        self.listFaces: list[Face] = listFaces  # list of faces
+        self.listLines: list[Line] = listLines 
+        self.listFaces: list[Face] = listFaces 
         self.graph: list[list[tuple[int, int]]] = [
             [] for _ in range(len(listPoints))
         ]  # tuple of (point index, line index)
@@ -132,7 +129,6 @@ class OrigamiObject:
             self.graph[p1Index].append((p2Index, line_index))
             self.graph[p2Index].append((p1Index, line_index))
         
-        # Calculate face original angles
         for face in listFaces:
             face.alpha1, face.alpha2, face.alpha3 = \
                 OrigamiObject.calculate_face_angles(
@@ -140,7 +136,7 @@ class OrigamiObject:
                     )
             
             face.calculate_and_update_line_index(listLines)
-        #Create list mapping LineIndex to List Face index
+
         self.mappingLineToFace: dict[int, list[int]] = {} #index cạnh
         for face_index in range(len(self.listFaces)):
             face = self.listFaces[face_index]
@@ -153,9 +149,6 @@ class OrigamiObject:
             self.mappingLineToFace[face.line12Index].append(face_index)
             self.mappingLineToFace[face.line23Index].append(face_index)
             self.mappingLineToFace[face.line13Index].append(face_index)
-       
-        # for line_index in range(len(self.listLines)):
-        #     listLines[line_index].currentTheta = self.calculate_theta(line_index)
       
     def __str__(self) -> str:
         return f"OrigamiObject({self.listPoints}, {self.listLines})"
@@ -193,31 +186,22 @@ class OrigamiObject:
         denominator = torch.norm(B - A)
         return numerator / denominator
 
-    
-    def calculate_theta(self, lineIndex: int, p3: Point, p4: Point,face1: Face, face2: Face) -> float:
-        if len(self.mappingLineToFace[lineIndex]) != 2:
-            return 0.0
-        
+    def calculate_theta(self, lineIndex: int, p3: Point, p4: Point,face1: Face, face2: Face, fold_percent = 1.0) -> float:
+        if len(self.mappingLineToFace[lineIndex]) != 2:    return 0.0
         
         n1 = face1.calculate_and_update_normal(self.listPoints)
         n2 = face2.calculate_and_update_normal(self.listPoints)
         
-        # Assume n1 and n2 are torch tensors; if not, convert them here
-        # e.g., n1 = torch.tensor([n1.x, n1.y, n1.z], dtype=torch.float32)
-        # Same for n2 and points below
-        
-        # Crease vector: assuming Point has x, y, z attributes
         node0 = p3.position
         node1 = p4.position
         creaseVector = torch.nn.functional.normalize(node1 - node0, dim=0)
         
         dotNormals = torch.dot(n1, n2).clamp(-1.0, 1.0)
         
-        # y = dot(cross(n1, creaseVector), n2)
         cross_n1_crease = torch.cross(n1, n2)
         y = torch.dot(cross_n1_crease, creaseVector)
         
-        unsignedTheta = torch.acos(dotNormals)  # [0, pi]
+        unsignedTheta = torch.acos(dotNormals)  
         
         signTheta = torch.sign(y)
         
@@ -253,9 +237,6 @@ class OrigamiObject:
         angle_B = angle(ba, bc)
         angle_C = angle(ca, cb)
         return angle_A, angle_B, angle_C
-    
-
-
     
 
 if __name__ == "__main__":
