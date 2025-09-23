@@ -100,10 +100,10 @@ class OrigamiObject:
     ) -> None:
         self.listPoints: list[Point] = listPoints  # list of points, order is not change
 
-        min_position_x = 9999999
-        max_position_x = -9999999
-        min_position_y = 9999999
-        max_position_y = -9999999
+        min_position_x = 9999999.0
+        max_position_x = -9999999.0
+        min_position_y = 9999999.0
+        max_position_y = -9999999.0
         a = -1.0
         b = -a
         for point in listPoints:
@@ -111,13 +111,20 @@ class OrigamiObject:
             max_position_x = max(point.originalPosition.tolist()[0],max_position_x)
             min_position_y = min(point.originalPosition.tolist()[2],min_position_y)
             max_position_y = max(point.originalPosition.tolist()[2],max_position_y)
-            
-        #Doan nay thenm vo khong thay cai hinh luon
+        
+        self.top_position = -(b-a)*(max_position_y-min_position_y)/(max_position_x-min_position_x)/2.0
+        self.bottom_position = -self.top_position
+        self.left_position = a
+        self.right_position = b
+        self.height = self.bottom_position - self.top_position
+        self.width = self.right_position - self.left_position
+
         for point in listPoints:
             x_ = a + (point.originalPosition.tolist()[0]-min_position_x)*(b-a)/(max_position_x-min_position_x)
-            z_ = a + (point.originalPosition.tolist()[2]-min_position_y)*(b-a)/(max_position_y-min_position_y)
+            z_ = self.top_position + (point.originalPosition.tolist()[2]-min_position_y)*(b-a)/(max_position_x-min_position_x)
             point.originalPosition = torch.tensor([x_,0.0,z_])
             point.position = point.originalPosition.clone()
+
 
         self.listLines: list[Line] = listLines 
         self.listFaces: list[Face] = listFaces 
@@ -149,6 +156,9 @@ class OrigamiObject:
             self.mappingLineToFace[face.line12Index].append(face_index)
             self.mappingLineToFace[face.line23Index].append(face_index)
             self.mappingLineToFace[face.line13Index].append(face_index)
+
+        # Point cloud
+        self.listPointCloud = self.init_pointclound()
       
     def __str__(self) -> str:
         return f"OrigamiObject({self.listPoints}, {self.listLines})"
@@ -198,7 +208,7 @@ class OrigamiObject:
         
         dotNormals = torch.dot(n1, n2).clamp(-1.0, 1.0)
         
-        cross_n1_crease = torch.cross(n1, n2)
+        cross_n1_crease = torch.linalg.cross(n1, n2)
         y = torch.dot(cross_n1_crease, creaseVector)
         
         unsignedTheta = torch.acos(dotNormals)  
@@ -238,6 +248,89 @@ class OrigamiObject:
         angle_C = angle(ca, cb)
         return angle_A, angle_B, angle_C
     
+    def init_pointclound(self, resolution: int = 20):
+        def solve_equation(a: float, b: float, c: float, d: float, e: float, f: float):
+            """
+                ax + by = c
+                dx + ey = f
+                solve for x, y
+            """
+            det = a * e - b * d
+
+            if det != 0:
+                x = (c * e - b * f) / det
+                y = (a * f - c * d) / det
+                return x, y
+            else:
+                return None, None
+        def is_point_in_triangle(point_p: torch.Tensor, point_a: torch.Tensor, point_b: torch.Tensor, point_c: torch.Tensor, eps=1e-6) -> bool:
+            v0 = point_b - point_a
+            v1 = point_c - point_a
+            v2 = point_p - point_a
+
+            dot00 = torch.dot(v0, v0)
+            dot01 = torch.dot(v0, v1)
+            dot02 = torch.dot(v0, v2)
+            dot11 = torch.dot(v1, v1)
+            dot12 = torch.dot(v1, v2)
+
+            inv_denom = 1 / (dot00 * dot11 - dot01 * dot01)
+            u = (dot11 * dot02 - dot01 * dot12) * inv_denom
+            v = (dot00 * dot12 - dot01 * dot02) * inv_denom
+
+            return (u.item() >= -eps) and (v.item() >= -eps) and ((u + v).item() <= 1.0 + eps)
+        
+        listPointCloud = []
+        
+        step_size = self.width/resolution
+        for i in range(resolution):
+            for j in range(int(resolution*self.height/self.width)):
+                listPointCloud.append({
+                    "point": Point(self.left_position + i*step_size,0.0, self.top_position + j*step_size),
+                    "face_index": None,
+                    "p1Index": None,
+                    "p2Index": None,
+                    "p3Index": None,
+                    "x_solved": None,
+                    "y_solved": None,
+                })
+        for i in range(len(listPointCloud)):
+            for face_index, face in enumerate(self.listFaces):
+                p1 = self.listPoints[face.point1Index].position
+                p2 = self.listPoints[face.point2Index].position
+                p3 = self.listPoints[face.point3Index].position
+                p4 = listPointCloud[i]["point"].position
+                if is_point_in_triangle(p4, p1, p2, p3):
+                    listPointCloud[i]["face_index"] = face_index
+                    v12 = p2 - p1
+                    v13 = p3 - p1
+                    listPointCloud[i]["p1Index"] = face.point1Index
+                    listPointCloud[i]["p2Index"] = face.point2Index
+                    listPointCloud[i]["p3Index"] = face.point3Index
+                    v12list = v12.tolist()
+                    v13list = v13.tolist()
+                    p1list = p1.tolist()
+                    p4list = p4.tolist()
+                    x, y = solve_equation(v12list[0], v13list[0], p4list[0]-p1list[0],
+                                          v12list[2], v13list[2], p4list[2]-p1list[2])
+                    listPointCloud[i]["x_solved"] = x
+                    listPointCloud[i]["y_solved"] = y
+                    break
+        return listPointCloud
+    
+    def update_pointcloud_position(self):
+        for i in range(len(self.listPointCloud)):
+            if self.listPointCloud[i]["face_index"] is None:
+                continue
+            face = self.listFaces[self.listPointCloud[i]["face_index"]]
+            p1 = self.listPoints[face.point1Index].position
+            p2 = self.listPoints[face.point2Index].position
+            p3 = self.listPoints[face.point3Index].position
+            v12 = p2 - p1
+            v13 = p3 - p1
+            x = self.listPointCloud[i]["x_solved"]
+            y = self.listPointCloud[i]["y_solved"]
+            self.listPointCloud[i]["point"].position = p1 + x * v12 + y * v13
 
 if __name__ == "__main__":
     listPoints = [Point(0,1,2), Point(4, 5, 6), Point(7, 8, 9), Point(10, 11, 12)]

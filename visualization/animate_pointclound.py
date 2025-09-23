@@ -14,11 +14,11 @@ class Plotter:
             "Line": [],
             "Face": [],
         } # list of (geometry, base_vertices)
-        for point in o.listPoints:
-            self.geometries["Point"].append(self.init_point(size=10))
-        for line in o.listLines:
-            print(line.get_line_original_length(o.listPoints))
-            self.geometries["Line"].append(self.init_line(length=line.get_line_original_length(o.listPoints), size=5))
+        for _ in range(len(o.listPointCloud)):
+            self.geometries["Point"].append(self.init_point(size=0.01))
+        # for line in o.listLines:
+        #     print(line.get_line_original_length(o.listPoints))
+        #     self.geometries["Line"].append(self.init_line(length=line.get_line_original_length(o.listPoints), size=5))
         self.nextFrame = nextFrame
 
     def show(self):
@@ -27,35 +27,33 @@ class Plotter:
         
         for g in self.geometries['Point']:
             vis.add_geometry(g[0])
-        for g in self.geometries['Line']:
-            vis.add_geometry(g[0])
-        vis.add_geometry(o3d.geometry.TriangleMesh.create_coordinate_frame())
+        # for g in self.geometries['Line']:
+        #     vis.add_geometry(g[0])
+        vis.add_geometry(o3d.geometry.TriangleMesh.create_coordinate_frame(size=1.0))
 
         view_ctl = vis.get_view_control()
-        view_ctl.set_lookat(np.array([500.0, 0, 500.0]))
+        view_ctl.set_lookat(np.array([0.0, 0, 0.0]))
         view_ctl.set_up([0, 1, 0])
         view_ctl.set_front([0, 0, -1])
-        view_ctl.set_zoom(0.8)
 
         while True:
             self.nextFrame(self.o)
             self.update_geometries()
             for g in self.geometries['Point']:
                 vis.update_geometry(g[0])
-            for g in self.geometries['Line']:
-                vis.update_geometry(g[0])
+            # for g in self.geometries['Line']:
+            #     vis.update_geometry(g[0])
             if not vis.poll_events():
                 break
             vis.update_renderer()
         
     def update_geometries(self):
         for i, g in enumerate(self.geometries["Point"]):
-            self.set_position_point(g[0], g[1], self.o.listPoints[i].position)
-        for i, g in enumerate(self.geometries["Line"]):
-            p1 = self.o.listPoints[self.o.listLines[i].p1Index].position
-            p2 = self.o.listPoints[self.o.listLines[i].p2Index].position
-            self.set_position_line(g[0], g[1], p1, p2)
-        pass
+            self.set_position_point(g[0], g[1], self.o.listPointCloud[i]["point"].position)
+        # for i, g in enumerate(self.geometries["Line"]):
+        #     p1 = self.o.listPoints[self.o.listLines[i].p1Index].position
+        #     p2 = self.o.listPoints[self.o.listLines[i].p2Index].position
+        #     self.set_position_line(g[0], g[1], p1, p2)
 
     def tensor_to_np(self, t: torch.Tensor):
         return t.detach().cpu().numpy().astype(np.float64)

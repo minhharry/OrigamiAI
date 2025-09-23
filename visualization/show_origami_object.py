@@ -165,7 +165,7 @@ def show_origami_object_2d_new(origami: OrigamiObject, show_points: bool = True,
         for j, point in enumerate(listPoints):
             x, y = point.position[0].item(), point.position[2].item()
             ax.scatter(x, y, color="black", s=10)  # chấm đen nhỏ
-            ax.text(x + 1, y + 1, str(j), color="purple", fontsize=8)  # số hơi lệch để dễ nhìn
+            ax.text(x + 0.001, y + 0.001, str(j), color="purple", fontsize=8)  # số hơi lệch để dễ nhìn
 
     ax.set_aspect('equal', adjustable='box')
     plt.gca().invert_yaxis()  # SVG gốc có trục y lộn ngược

@@ -138,7 +138,6 @@ def get_points_line_from_svg(svg_file_path: str) -> tuple[list[Point], list[Line
     root = lxml.etree.parse(svg_file_path).getroot()
     listPoints, listLines = create_points_lines(root) #get all points , include intersection points
     listLines = break_lines(listPoints, listLines) # break lines if have point on line
-    print(len(listPoints), len(listLines))
     triangulate_all(listPoints, listLines) # triangulate all polygon to facet lines
     return listPoints, listLines
 

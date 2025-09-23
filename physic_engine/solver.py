@@ -20,7 +20,7 @@ K_FACE = 0.2
 
 DAMPING_RATIO = 0.45
 
-FOLD_PERCENT = 0.7
+FOLD_PERCENT = 0.9
 
 def clear(objectOrigami: OrigamiObject) -> None:
     for point in objectOrigami.listPoints:
@@ -29,11 +29,11 @@ def clear(objectOrigami: OrigamiObject) -> None:
 
 def setDeltaTime(objectOrigami: OrigamiObject) -> None:
     global DT
-    k_max = -1
+    k_max = -1.0
     for line in objectOrigami.listLines:
         l0 = OrigamiObject.getOriginalDistance(objectOrigami.listPoints[line.p1Index],objectOrigami.listPoints[line.p2Index])
         k_max = max(k_max,EA/l0)
-    DT = 1/(2*math.pi*math.sqrt(k_max)) # m = 1
+    DT = 1.0/(2.0*math.pi*math.sqrt(k_max)) # m = 1
 
 def addAxialConstraintsForce(objectOrigami: OrigamiObject) -> None:
     for line in objectOrigami.listLines:
@@ -133,9 +133,9 @@ def addFaceConstraintsForce(objectOrigami: OrigamiObject) -> None:
         anglesDiff = nominalAngles - angle
         anglesDiff *= K_FACE
 
-        normalCrossAC = torch.cross(n, ac)/length_ac
-        normalCrossAB = torch.cross(n, ab)/length_ab
-        normalCrossBC = torch.cross(n, bc)/length_bc
+        normalCrossAC = torch.linalg.cross(n, ac)/length_ac
+        normalCrossAB = torch.linalg.cross(n, ab)/length_ab
+        normalCrossBC = torch.linalg.cross(n, bc)/length_bc
 
         p1_a.force -= anglesDiff[0]*(normalCrossAC - normalCrossAB)
         p1_a.force -= anglesDiff[1]*normalCrossAB
@@ -163,7 +163,7 @@ def addDampingForce(objectOrigami: OrigamiObject) -> None:
         p1 = objectOrigami.listPoints[line.p1Index]
         p2 = objectOrigami.listPoints[line.p2Index]
         l0 = OrigamiObject.getOriginalDistance(p1,p2)
-        force =  2*DAMPING_RATIO*math.sqrt(EA/l0*POINT_MASS) * (p2.verlocity - p1.verlocity)
+        force =  2.0*DAMPING_RATIO*math.sqrt(EA/l0*POINT_MASS) * (p2.verlocity - p1.verlocity)
         p1.force += force
         p2.force -= force
     return
@@ -175,14 +175,8 @@ def calculateNewPositions(objectOrigami: OrigamiObject) -> None:
         point.position += point.verlocity * DT
     return
 
-# def calculateFriction(objectOrigami: OrigamiObject) -> None:
-#     for point in objectOrigami.listPoints:
-#         point.force -= point.verlocity*0.02
-#     return
-
 def solverStep(objectOrigami: OrigamiObject) -> None:
     clear(objectOrigami)
-    setDeltaTime(objectOrigami)
 
     addAxialConstraintsForce(objectOrigami)
     addCreaseConstraintsForce(objectOrigami)
@@ -191,4 +185,6 @@ def solverStep(objectOrigami: OrigamiObject) -> None:
     addDampingForce(objectOrigami)
     calculateVelocities(objectOrigami)
     calculateNewPositions(objectOrigami)
+
+    objectOrigami.update_pointcloud_position()
     return

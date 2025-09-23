@@ -2,7 +2,8 @@ from visualization.show_origami_object import show_origami_object, show_origami_
 from object.origami_object import OrigamiObject, Point, Line, Face, LineType
 from utils.get_points_line_from_svg import get_points_line_from_svg
 from utils.get_faces_from_points_lines import get_faces_from_points_lines
-from physic_engine.solver import solverStep
+from physic_engine.solver import solverStep, setDeltaTime
+from visualization.animate_pointclound import Plotter
 from visualization.animate import show_origami_object_open3d
 
 def main():
@@ -34,10 +35,11 @@ def main2():
     show_origami_object(o)
 
 def main3():
-    IMAGE_PATH = "assets/flappingBird.svg"
+    IMAGE_PATH = "assets/airplane_output.svg"
     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
     listFaces = get_faces_from_points_lines(listPoints, listLines)
     o = OrigamiObject(listPoints, listLines, listFaces)
+    setDeltaTime(o)
     # o.listPoints[0].is_fixed = True
     show_origami_object_open3d(o,solverStep,30,True,True,True,True,2)
 
@@ -52,5 +54,15 @@ def main4():
     print("d: ",OrigamiObject.calculate_distance_point_to_line_2(p1,p2,p3))
     show_origami_object_2d_new(o,True,True)
 
+def show_force():
+    IMAGE_PATH = "assets/flappingBird.svg"
+    listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
+    listFaces = get_faces_from_points_lines(listPoints, listLines)
+    o = OrigamiObject(listPoints, listLines, listFaces)
+    setDeltaTime(o)
+    # o.listPoints[0].is_fixed = True
+    plotter = Plotter(o, solverStep)
+    plotter.show()
+
 if __name__ == "__main__":
-    main3()
+    show_force()
