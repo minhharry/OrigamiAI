@@ -8,7 +8,7 @@ class Point:
         self.originalPosition = torch.tensor([x, y, z], dtype=torch.float32)
         self.force = torch.tensor([0, 0, 0], dtype=torch.float32)
         self.verlocity = torch.tensor([0, 0, 0], dtype=torch.float32)
-
+        self.is_fixed = False
     def __str__(self):
         return f"Point({self.position[0]}, {self.position[1]}, {self.position[2]})"
 
@@ -26,13 +26,13 @@ class LineType(Enum):
 
 
 class Line:
-    def __init__(self, p1Index: int, p2Index: int, lineType: LineType, targetTheta: float = 0) -> None:
+    def __init__(self, p1Index: int, p2Index: int, lineType: LineType, targetTheta: torch.Tensor = torch.tensor(0.0)) -> None:
         self.p1Index = p1Index
         self.p2Index = p2Index
         self.lineType = lineType
         self.targetTheta = targetTheta
-        self.currentTheta = 0.0
-        self.lastTheta = 0.0
+        self.currentTheta = torch.tensor(0.0)
+        self.lastTheta = torch.tensor(0.0)
 
     def __str__(self) -> str:
         return f"Line({self.p1Index}, {self.p2Index}, {self.lineType},{self.targetTheta},{self.currentTheta} )"
@@ -186,8 +186,8 @@ class OrigamiObject:
         denominator = torch.norm(B - A)
         return numerator / denominator
 
-    def calculate_theta(self, lineIndex: int, p3: Point, p4: Point,face1: Face, face2: Face, fold_percent = 1.0) -> float:
-        if len(self.mappingLineToFace[lineIndex]) != 2:    return 0.0
+    def calculate_theta(self, lineIndex: int, p3: Point, p4: Point,face1: Face, face2: Face, fold_percent = 1.0) -> torch.Tensor:
+        if len(self.mappingLineToFace[lineIndex]) != 2:    return torch.tensor(0.0)
         
         n1 = face1.calculate_and_update_normal(self.listPoints)
         n2 = face2.calculate_and_update_normal(self.listPoints)
@@ -216,9 +216,9 @@ class OrigamiObject:
             diff -= TWO_PI
         theta = lastTheta + diff
         
-        self.listLines[lineIndex].lastTheta = theta.item()
+        self.listLines[lineIndex].lastTheta = theta
         
-        return theta.item()
+        return theta
     
     @classmethod
     def calculate_face_angles(cls, p1: Point, p2: Point, p3: Point) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:

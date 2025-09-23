@@ -102,8 +102,12 @@ def create_points_lines(root) -> tuple[list[Point], list[Line]]:
                 opacity = float(child.attrib.get('opacity')) 
             elif child.attrib.get('stroke-opacity'):
                 opacity= float(child.attrib.get('stroke-opacity'))
-            targetTheta = -opacity*math.pi if (get_type_line_from_svg(child)==LineType.MOUNTAIN) else opacity*math.pi
-            listLines.append(Line(index1, index2, get_type_line_from_svg(child),targetTheta))
+            targetTheta = 0
+            if (get_type_line_from_svg(child)==LineType.MOUNTAIN):
+                targetTheta = -opacity*math.pi
+            elif get_type_line_from_svg(child)==LineType.VALLEY:
+                targetTheta = opacity*math.pi
+            listLines.append(Line(index1, index2, get_type_line_from_svg(child),torch.tensor(targetTheta)))
         for i in range(len(listLines)):
             for j in range(i+1, len(listLines)):
                 intersectionPoint = get_intersection_point(listPoints,listLines[i], listLines[j])
@@ -208,7 +212,7 @@ def triangluate_poly(listPoints: list[Point], listLines: list[Line]) -> list[Lin
                 break
         if intersects:
             continue
-        new_lines.append(Line(i, j, LineType.FACET,0.0))
+        new_lines.append(Line(i, j, LineType.FACET, torch.tensor(0.0)))
 
     return new_lines
 

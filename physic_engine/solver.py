@@ -14,13 +14,13 @@ POINT_MASS = 1.0 # Mass of point
 DT = 0.01
 
 K_FOLD = 0.7
-K_FACET = 10
+K_FACET = 0.7
 
 K_FACE = 0.2
 
-DAMPING_RATIO = 0.15
+DAMPING_RATIO = 0.35
 
-FOLD_PERCENT = 0.9
+FOLD_PERCENT = 1
 
 def clear(objectOrigami: OrigamiObject) -> None:
     for point in objectOrigami.listPoints:
@@ -53,11 +53,8 @@ def addCreaseConstraintsForce(objectOrigami: OrigamiObject) -> None:
         if len(faceIndices)==0 or len(faceIndices)>=3: raise ValueError(f"len(faceIndices) {len(faceIndices)} is not 1 or 2")
         
         K_CREASE = 0.0
-        if (
-            objectOrigami.listLines[lineIndex].lineType == LineType.MOUNTAIN 
-            or
-              objectOrigami.listLines[lineIndex].lineType == LineType.VALLEY 
-            ):
+        if objectOrigami.listLines[lineIndex].lineType == LineType.MOUNTAIN or \
+           objectOrigami.listLines[lineIndex].lineType == LineType.VALLEY:
             l0 = objectOrigami.listLines[lineIndex].get_line_original_length(objectOrigami.listPoints)
             K_CREASE = l0*K_FOLD
         elif (objectOrigami.listLines[lineIndex].lineType==LineType.FACET):
@@ -86,10 +83,8 @@ def addCreaseConstraintsForce(objectOrigami: OrigamiObject) -> None:
         p2_index = (face2_indices - crease_indices).pop() 
         p1 = objectOrigami.listPoints[p1_index]
         p2 = objectOrigami.listPoints[p2_index]
-       
       
         theta = objectOrigami.calculate_theta(lineIndex,p3,p4,face1,face2)
-
         target_theta = objectOrigami.listLines[lineIndex].targetTheta*FOLD_PERCENT
         force = -K_CREASE*(theta-target_theta)
 
@@ -99,25 +94,23 @@ def addCreaseConstraintsForce(objectOrigami: OrigamiObject) -> None:
         h2 = OrigamiObject.calculate_distance_point_to_line_2(p2,p3,p4)
         alpha_4_31, alpha_3_14, alpha_1_43 = OrigamiObject.calculate_face_angles(p4,p3,p1)
         alpha_4_23, alpha_3_42, alpha_2_43 = OrigamiObject.calculate_face_angles(p4,p3,p2)
+
         cot_4_31 = 1.0/torch.tan(alpha_4_31)
         cot_3_14 = 1.0/torch.tan(alpha_3_14)
-
         cot_4_23 = 1.0/torch.tan(alpha_4_23)
         cot_3_42 = 1.0/torch.tan(alpha_3_42)
 
         p1.force += force*n1/h1
         p2.force += force*n2/h2
-
         p3.force += force*(-cot_4_31/(cot_4_31+cot_3_14)*n1/h1-cot_4_23/(cot_4_23+cot_3_42)*n2/h2)
         p4.force += force*(-cot_3_14/(cot_4_31+cot_3_14)*n1/h1-cot_3_42/(cot_4_23+cot_3_42)*n2/h2)
-   
     return
 
 def addFaceConstraintsForce(objectOrigami: OrigamiObject) -> None:
     def calculateUnitVectorForce(face: Face, p1: Point, p2: Point, p3: Point) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # Calculate at point p2
-        delta_p1 = torch.linalg.cross(face.normal, (p1.position - p2.position)) / (torch.linalg.norm(p1.position - p2.position)** 2)
-        delta_p3 = -torch.linalg.cross(face.normal, (p3.position - p2.position)) / (torch.linalg.norm(p2.position - p3.position)** 2)
+        delta_p1 = torch.linalg.cross(face.normal, (p1.position - p2.position)) / torch.linalg.norm(p1.position - p2.position)
+        delta_p3 = -torch.linalg.cross(face.normal, (p3.position - p2.position)) / torch.linalg.norm(p2.position - p3.position)
         delta_p2 = - delta_p1 - delta_p3 
         return delta_p1, delta_p2, delta_p3
     
@@ -150,6 +143,7 @@ def addFaceConstraintsForce(objectOrigami: OrigamiObject) -> None:
 
 def calculateVelocities(objectOrigami: OrigamiObject) -> None:
     for point in objectOrigami.listPoints:
+        if point.is_fixed: continue
         a = point.force / POINT_MASS
         point.verlocity += a * DT
     return
@@ -166,8 +160,15 @@ def addDampingForce(objectOrigami: OrigamiObject) -> None:
 
 def calculateNewPositions(objectOrigami: OrigamiObject) -> None:
     for point in objectOrigami.listPoints:
+        if point.is_fixed == True:
+            continue
         point.position += point.verlocity * DT
     return
+
+# def calculateFriction(objectOrigami: OrigamiObject) -> None:
+#     for point in objectOrigami.listPoints:
+#         point.force -= point.verlocity*0.02
+#     return
 
 def solverStep(objectOrigami: OrigamiObject) -> None:
     clear(objectOrigami)
@@ -177,6 +178,7 @@ def solverStep(objectOrigami: OrigamiObject) -> None:
     addCreaseConstraintsForce(objectOrigami)
     addFaceConstraintsForce(objectOrigami)
 
+    # calculateFriction(objectOrigami)
     addDampingForce(objectOrigami)
     calculateVelocities(objectOrigami)
     calculateNewPositions(objectOrigami)

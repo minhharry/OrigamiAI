@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="727.2727272727273px" height="1000px">
+  <rect x="0" y="0" width="727.2727272727273" height="1000" fill="#FFFFFF" stroke="#000000" stroke-width="10"/>
+  <line x1="363.6363636363636" y1="0.0" x2="0.0" y2="90.9090909090909" stroke="#0000ff" stroke-width="10" stroke-opacity="1"/>
+  <line x1="363.6363636363636" y1="0.0" x2="727.2727272727273" y2="90.9090909090909" stroke="#0000ff" stroke-width="10" stroke-opacity="1"/>
+  <line x1="0.0" y1="181.8181818181818" x2="363.6363636363636" y2="0.0" stroke="#ff0000" stroke-width="10" stroke-opacity="1"/>
+  <line x1="363.6363636363636" y1="0.0" x2="727.2727272727273" y2="181.8181818181818" stroke="#ff0000" stroke-width="10" stroke-opacity="1"/>
+  <line x1="0.0" y1="272.72727272727275" x2="363.6363636363636" y2="0.0" stroke="#ff0000" stroke-width="10" stroke-opacity="1"/>
+  <line x1="363.6363636363636" y1="0.0" x2="727.2727272727273" y2="272.72727272727275" stroke="#ff0000" stroke-width="10" stroke-opacity="1"/>
+  <line x1="0.0" y1="454.5454545454545" x2="363.6363636363636" y2="0.0" stroke="#0000ff" stroke-width="10" stroke-opacity="1"/>
+  <line x1="363.6363636363636" y1="0.0" x2="0.0" y2="636.3636363636364" stroke="#0000ff" stroke-width="10" stroke-opacity="1"/>
+  <line x1="363.6363636363636" y1="0.0" x2="0.0" y2="818.1818181818181" stroke="#0000ff" stroke-width="10" stroke-opacity="1"/>
+  <line x1="363.6363636363636" y1="0.0" x2="727.2727272727273" y2="454.5454545454545" stroke="#0000ff" stroke-width="10" stroke-opacity="1"/>
+  <line x1="363.6363636363636" y1="0.0" x2="727.2727272727273" y2="636.3636363636364" stroke="#0000ff" stroke-width="10" stroke-opacity="1"/>
+  <line x1="363.6363636363636" y1="0.0" x2="727.2727272727273" y2="818.1818181818181" stroke="#0000ff" stroke-width="10" stroke-opacity="1"/>
+  <line x1="363.6363636363636" y1="0.0" x2="181.8181818181818" y2="1000.0" stroke="#0000ff" stroke-width="10" stroke-opacity="0.5"/>
+  <line x1="363.6363636363636" y1="0.0" x2="545.4545454545455" y2="1000.0" stroke="#0000ff" stroke-width="10" stroke-opacity="0.5"/>
+  <line x1="363.6363636363636" y1="0.0" x2="363.6363636363636" y2="1000.0" stroke="#0000ff" stroke-width="10" stroke-opacity="1"/>
+</svg>

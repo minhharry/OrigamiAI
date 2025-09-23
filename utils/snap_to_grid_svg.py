@@ -1,4 +1,4 @@
-from lxml import etree
+from lxml import etree # type: ignore
 
 NAMESPACE = '{http://www.w3.org/2000/svg}'
 LINE_TAG = NAMESPACE + 'line'
