@@ -4,8 +4,6 @@ from utils.get_points_line_from_svg import get_points_line_from_svg
 from utils.get_faces_from_points_lines import get_faces_from_points_lines
 from physic_engine.solver import solverStep
 from visualization.animate import show_origami_object_open3d
-import torch
-import sys
 
 def main():
     IMAGE_PATH = "assets/M.svg"
@@ -36,15 +34,15 @@ def main2():
     show_origami_object(o)
 
 def main3():
-    IMAGE_PATH = "assets/airplane_output.svg"
+    IMAGE_PATH = "assets/flappingBird.svg"
     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
     listFaces = get_faces_from_points_lines(listPoints, listLines)
     o = OrigamiObject(listPoints, listLines, listFaces)
-    o.listPoints[0].is_fixed = True
+    # o.listPoints[0].is_fixed = True
     show_origami_object_open3d(o,solverStep,30,True,True,True,True,2)
 
 def main4():
-    IMAGE_PATH = "assets/airplane_output.svg"
+    IMAGE_PATH = "assets/ML.svg"
     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
     listFaces = get_faces_from_points_lines(listPoints, listLines)
     o = OrigamiObject(listPoints, listLines, listFaces)

@@ -104,7 +104,7 @@ class OrigamiObject:
         max_position_x = -9999999
         min_position_y = 9999999
         max_position_y = -9999999
-        a = -1.0/math.sqrt(2)
+        a = -1.0
         b = -a
         for point in listPoints:
             min_position_x = min(point.originalPosition.tolist()[0],min_position_x)

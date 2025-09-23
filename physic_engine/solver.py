@@ -18,9 +18,9 @@ K_FACET = 0.7
 
 K_FACE = 0.2
 
-DAMPING_RATIO = 0.35
+DAMPING_RATIO = 0.45
 
-FOLD_PERCENT = 1
+FOLD_PERCENT = 0.7
 
 def clear(objectOrigami: OrigamiObject) -> None:
     for point in objectOrigami.listPoints:
@@ -107,39 +107,49 @@ def addCreaseConstraintsForce(objectOrigami: OrigamiObject) -> None:
     return
 
 def addFaceConstraintsForce(objectOrigami: OrigamiObject) -> None:
-    def calculateUnitVectorForce(face: Face, p1: Point, p2: Point, p3: Point) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        # Calculate at point p2
-        delta_p1 = torch.linalg.cross(face.normal, (p1.position - p2.position)) / torch.linalg.norm(p1.position - p2.position)
-        delta_p3 = -torch.linalg.cross(face.normal, (p3.position - p2.position)) / torch.linalg.norm(p2.position - p3.position)
-        delta_p2 = - delta_p1 - delta_p3 
-        return delta_p1, delta_p2, delta_p3
-    
     for face in objectOrigami.listFaces:
-        p1 = objectOrigami.listPoints[face.point1Index]
-        p2 = objectOrigami.listPoints[face.point2Index]
-        p3 = objectOrigami.listPoints[face.point3Index]
+        p1_a = objectOrigami.listPoints[face.point1Index]
+        p2_b = objectOrigami.listPoints[face.point2Index]
+        p3_c = objectOrigami.listPoints[face.point3Index]
+        n =  face.calculate_and_update_normal(objectOrigami.listPoints)
+        nominalAngles = torch.tensor([face.alpha1,face.alpha2,face.alpha3])
+        ab = p2_b.position-p1_a.position
+        ac = p3_c.position-p1_a.position
+        bc = p3_c.position-p2_b.position
 
-        face.calculate_and_update_normal(objectOrigami.listPoints)
-        a1, a2, a3 = OrigamiObject.calculate_face_angles(p1, p2, p3)
+        length_ab = torch.linalg.norm(ab)
+        length_ac = torch.linalg.norm(ac)
+        length_bc = torch.linalg.norm(bc)
 
-        # Calculate unit vector force at point p2
-        delta_p1, delta_p2, delta_p3 = calculateUnitVectorForce(face, p1, p2, p3)
-        p1.force += K_FACE * (face.alpha1 - a1) * delta_p1
-        p2.force += K_FACE * (face.alpha2 - a2) * delta_p2
-        p3.force += K_FACE * (face.alpha3 - a3) * delta_p3
+        ab = ab/length_ab
+        ac = ac/length_ac
+        bc = bc/length_bc
 
-        # Calculate unit vector force at point p3
-        delta_p1, delta_p2, delta_p3 = calculateUnitVectorForce(face, p2, p3, p1)
-        p1.force += K_FACE * (face.alpha1 - a1) * delta_p1
-        p2.force += K_FACE * (face.alpha2 - a2) * delta_p2        
-        p3.force += K_FACE * (face.alpha3 - a3) * delta_p3
+        angle = torch.tensor([torch.acos(torch.dot(ab,ac)),
+                              torch.acos(-1.0*torch.dot(ab,bc)),
+                              torch.acos(torch.dot(ac,bc))
+                              ])
+        
+        anglesDiff = nominalAngles - angle
+        anglesDiff *= K_FACE
 
-        # Calculate unit vector force at point p1
-        delta_p1, delta_p2, delta_p3 = calculateUnitVectorForce(face, p3, p1, p2)
-        p1.force += K_FACE * (face.alpha1 - a1) * delta_p1
-        p2.force += K_FACE * (face.alpha2 - a2) * delta_p2
-        p3.force += K_FACE * (face.alpha3 - a3) * delta_p3
+        normalCrossAC = torch.cross(n, ac)/length_ac
+        normalCrossAB = torch.cross(n, ab)/length_ab
+        normalCrossBC = torch.cross(n, bc)/length_bc
+
+        p1_a.force -= anglesDiff[0]*(normalCrossAC - normalCrossAB)
+        p1_a.force -= anglesDiff[1]*normalCrossAB
+        p1_a.force += anglesDiff[2]*normalCrossAC
+
+        p2_b.force -= anglesDiff[0]*normalCrossAB
+        p2_b.force += anglesDiff[1]*(normalCrossAB + normalCrossBC)
+        p2_b.force -= anglesDiff[2]*normalCrossBC
+
+        p3_c.force += anglesDiff[0]*normalCrossAC
+        p3_c.force -= anglesDiff[1]*normalCrossBC
+        p3_c.force += anglesDiff[2]*(normalCrossBC - normalCrossAC)
     return
+
 
 def calculateVelocities(objectOrigami: OrigamiObject) -> None:
     for point in objectOrigami.listPoints:
@@ -177,8 +187,7 @@ def solverStep(objectOrigami: OrigamiObject) -> None:
     addAxialConstraintsForce(objectOrigami)
     addCreaseConstraintsForce(objectOrigami)
     addFaceConstraintsForce(objectOrigami)
-
-    # calculateFriction(objectOrigami)
+   
     addDampingForce(objectOrigami)
     calculateVelocities(objectOrigami)
     calculateNewPositions(objectOrigami)
