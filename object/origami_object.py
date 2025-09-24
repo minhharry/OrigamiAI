@@ -1,6 +1,7 @@
 import torch
 import math
 from enum import Enum
+import random
 
 class Point:
     def __init__(self, x: float, y: float, z: float) -> None:
@@ -286,7 +287,7 @@ class OrigamiObject:
         for i in range(resolution):
             for j in range(int(resolution*self.height/self.width)):
                 listPointCloud.append({
-                    "point": Point(self.left_position + i*step_size,0.0, self.top_position + j*step_size),
+                    "point": Point(self.left_position + i*step_size + random.random()*step_size,0.0, self.top_position + j*step_size + random.random()*step_size),
                     "face_index": None,
                     "p1Index": None,
                     "p2Index": None,

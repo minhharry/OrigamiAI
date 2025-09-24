@@ -3,7 +3,7 @@ from object.origami_object import OrigamiObject, Point, Line, Face, LineType
 from utils.get_points_line_from_svg import get_points_line_from_svg
 from utils.get_faces_from_points_lines import get_faces_from_points_lines
 from physic_engine.solver import solverStep, setDeltaTime
-from visualization.animate_pointclound import Plotter
+from visualization.animate_pointcloud import Plotter
 from visualization.animate import show_origami_object_open3d
 
 def main():
@@ -34,7 +34,7 @@ def main2():
         solverStep(o)
     show_origami_object(o)
 
-def main3():
+def show_full():
     IMAGE_PATH = "assets/airplane_output.svg"
     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
     listFaces = get_faces_from_points_lines(listPoints, listLines)
@@ -54,7 +54,7 @@ def main4():
     print("d: ",OrigamiObject.calculate_distance_point_to_line_2(p1,p2,p3))
     show_origami_object_2d_new(o,True,True)
 
-def show_force():
+def show_pointcloud():
     IMAGE_PATH = "assets/flappingBird.svg"
     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
     listFaces = get_faces_from_points_lines(listPoints, listLines)
@@ -65,4 +65,30 @@ def show_force():
     plotter.show()
 
 if __name__ == "__main__":
-    show_force()
+    import argparse
+    import sys
+
+    # 1. Create the parser
+    parser = argparse.ArgumentParser(description="A simple file processor.")
+
+    # 2. Add arguments
+    parser.add_argument("function", help="function to call")
+
+    # 3. Parse the arguments
+    args = parser.parse_args()
+
+    mapping = {
+        'main': main,
+        'main2': main2,
+        'show_full': show_full,
+        'main4': main4,
+        'show_pointcloud': show_pointcloud,
+    }
+
+    # 4. Use the arguments in your script
+    try:
+        mapping[args.function]()
+
+    except:
+        print(f"Error: The function '{args.function}' was not found.")
+        sys.exit(1)
