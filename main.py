@@ -5,6 +5,7 @@ from utils.get_faces_from_points_lines import get_faces_from_points_lines
 from physic_engine.solver import solverStep, setDeltaTime
 from visualization.animate_pointcloud import Plotter
 from visualization.animate import show_origami_object_open3d
+import time
 
 def main():
     IMAGE_PATH = "assets/M.svg"
@@ -64,6 +65,16 @@ def show_pointcloud():
     plotter = Plotter(o, solverStep)
     plotter.show()
 
+def benchmark():
+    IMAGE_PATH = "assets/M.svg"
+    listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
+    listFaces = get_faces_from_points_lines(listPoints, listLines)
+    o = OrigamiObject(listPoints, listLines, listFaces)
+    start_time = time.time()
+    for i in range(1000):
+        solverStep(o)
+    print("time for 1000 steps of solverStep:", time.time() - start_time)
+
 if __name__ == "__main__":
     import argparse
     import sys
@@ -83,6 +94,7 @@ if __name__ == "__main__":
         'show_full': show_full,
         'main4': main4,
         'show_pointcloud': show_pointcloud,
+        'benchmark': benchmark
     }
 
     # 4. Use the arguments in your script
