@@ -45,14 +45,10 @@ def show_full():
     show_origami_object_open3d(o,solverStep,30,True,True,True,True,2)
 
 def main4():
-    IMAGE_PATH = "assets/ML.svg"
+    IMAGE_PATH = "assets/M.svg"
     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
     listFaces = get_faces_from_points_lines(listPoints, listLines)
     o = OrigamiObject(listPoints, listLines, listFaces)
-    p1 = Point(1,0,0)
-    p2 = Point(0,1,0)
-    p3 = Point(0,2,0)
-    print("d: ",OrigamiObject.calculate_distance_point_to_line_2(p1,p2,p3))
     show_origami_object_2d_new(o,True,True)
 
 def show_pointcloud():

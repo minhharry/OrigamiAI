@@ -186,5 +186,5 @@ def solverStep(objectOrigami: OrigamiObject) -> None:
     calculateVelocities(objectOrigami)
     calculateNewPositions(objectOrigami)
 
-    objectOrigami.update_pointcloud_position()
+    # objectOrigami.update_pointcloud_position()
     return

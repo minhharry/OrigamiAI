@@ -12,6 +12,7 @@ class OrigamiObjectMatrix:
     def __init__(self, points: torch.Tensor,
                  lines: torch.Tensor,
                  faces: torch.Tensor,
+                 target_theta: torch.Tensor,
                  mass: float = 1.0,
                  k_axial: float = 100.0,
                  k_crease: float = 1.0,
@@ -25,10 +26,11 @@ class OrigamiObjectMatrix:
         self.num_points = points.shape[0]
         self.num_lines = lines.shape[0]
         self.num_faces = faces.shape[0]
-        self.masses = torch.full((self.num_points, 1), mass, device=self.device)
-        self.k_axial = torch.full((self.num_lines, 1), k_axial, device=self.device)
-        self.k_crease = torch.full((self.num_faces, 1), k_crease, device=self.device)
+        self.masses = mass
+        self.k_axial = k_axial
+        self.k_crease = k_crease
         self.theta = torch.full((self.num_faces, 1), 0.0, device=self.device)
+        self.target_theta = target_theta.to(self.device)
 
         self.damping = damping
         self.velocities = torch.zeros_like(self.points)
@@ -101,7 +103,7 @@ class OrigamiObjectMatrix:
         theta = self.theta + diff
         self.theta = theta
 
-        force_magnitudes_2 = -self.k_crease * (theta - (-torch.pi + 0.1))
+        force_magnitudes_2 = -self.k_crease * (theta - (self.target_theta))
 
         p1_forces_vectors = force_magnitudes_2 * (vec_n1 / h1)
         p2_forces_vectors = force_magnitudes_2 * (vec_n2 / h2)
@@ -137,10 +139,13 @@ if __name__ == "__main__":
     faces_indices = torch.tensor([
         [3, 1, 2, 0]
     ])
+    target_theta = torch.tensor([
+        [3.10],
+    ])
 
-    ori = OrigamiObjectMatrix(points, lines, faces_indices)
+    ori = OrigamiObjectMatrix(points, lines, faces_indices, target_theta)
 
-    VISUALIZE = False
+    VISUALIZE = True
     if VISUALIZE:
         fig = plt.figure(figsize=(10, 10))
         ax = fig.add_subplot(111, projection='3d')
