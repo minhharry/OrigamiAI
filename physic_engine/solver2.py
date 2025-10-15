@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import time
+import math
 
 def dd(*x):
     if True:
@@ -14,9 +15,10 @@ class OrigamiObjectMatrix:
                  faces: torch.Tensor,
                  target_theta: torch.Tensor,
                  mass: float = 1.0,
-                 k_axial: float = 100.0,
-                 k_crease: float = 1.0,
+                 ea: float = 20.0,
+                 k_crease: float = 0.7,
                  damping: float = 0.45,
+                 dt: float = -1.0, # -1 means auto config 
                  device: str = 'cpu'):
         self.device = device
         self.points = points.to(self.device)
@@ -27,13 +29,13 @@ class OrigamiObjectMatrix:
         self.num_lines = lines.shape[0]
         self.num_faces = faces.shape[0]
         self.masses = mass
-        self.k_axial = k_axial
+        self.ea = ea
         self.k_crease = k_crease
         self.theta = torch.full((self.num_faces, 1), 0.0, device=self.device)
-        self.target_theta = target_theta.to(self.device)
+        self.target_theta = (target_theta*0.9).to(self.device)
         self.origin_length = torch.zeros_like(self.target_theta)
         for i in range(self.num_faces):
-            self.origin_length[i] += torch.linalg.norm(self.points[self.faces[i, 0]] - self.points[self.faces[i, 1]])
+            self.origin_length[i] += torch.linalg.norm(self.points[self.faces[i, 2]] - self.points[self.faces[i, 3]])
 
         self.damping = damping
         self.velocities = torch.zeros_like(self.points)
@@ -41,8 +43,12 @@ class OrigamiObjectMatrix:
         p1 = self.points[self.lines[:, 0]]
         p2 = self.points[self.lines[:, 1]]
         self.rest_lengths = torch.norm(p2 - p1, dim=1, keepdim=True)
+
+        self.dt = dt
+        if dt < 0.0:
+            self.dt = 1.0/(2.0*math.pi*math.sqrt(self.ea/self.rest_lengths.min().item()))
     
-    def step(self, dt: float):
+    def step(self):
         point1 = self.points[self.lines[:, 0]]
         point2 = self.points[self.lines[:, 1]]
 
@@ -50,27 +56,14 @@ class OrigamiObjectMatrix:
         current_lengths = torch.linalg.norm(spring_vectors, dim=1, keepdim=True)
         current_lengths[current_lengths <= 1e-6] = 1e-6
         displacements = current_lengths - self.rest_lengths
-        force_magnitudes = -self.k_axial * displacements
+        force_magnitudes = -self.ea / self.rest_lengths * displacements
         force_vectors = force_magnitudes * (spring_vectors / current_lengths)
 
         total_forces = torch.zeros_like(self.points)
         total_forces.index_add_(0, self.lines[:, 1], force_vectors)  # spring force
         total_forces.index_add_(0, self.lines[:, 0], -force_vectors) # spring force
 
-        point1velocity = self.velocities[self.lines[:, 0]]
-        point2velocity = self.velocities[self.lines[:, 1]]
-        damping_force =  2.0*self.damping*5 * (point2velocity - point1velocity)
-        total_forces.index_add_(0, self.lines[:, 0], damping_force)  
-        total_forces.index_add_(0, self.lines[:, 1], -damping_force) 
-
-        # face force
-
-
-        # folding force
-        # p1.force += force*n1/h1
-        # p2.force += force*n2/h2
-        # p3.force += force*(-cot_4_31/(cot_4_31+cot_3_14)*n1/h1-cot_4_23/(cot_4_23+cot_3_42)*n2/h2)
-        # p4.force += force*(-cot_3_14/(cot_4_31+cot_3_14)*n1/h1-cot_3_42/(cot_4_23+cot_3_42)*n2/h2)
+        # fold force
         p1 = self.points[self.faces[:, 0]]
         p2 = self.points[self.faces[:, 1]]
         p3 = self.points[self.faces[:, 2]]
@@ -105,24 +98,28 @@ class OrigamiObjectMatrix:
         diff = torch.where(diff > 5.0, sub_tensor, diff)
         theta = self.theta + diff
         self.theta = theta
-
         force_magnitudes_2 = -self.k_crease * self.origin_length * (theta - (self.target_theta))
 
         p1_forces_vectors = force_magnitudes_2 * (vec_n1 / h1)
-        p2_forces_vectors = force_magnitudes_2 * (vec_n2 / h2)
-
-        total_forces.index_add_(0, self.faces[:, 0], p1_forces_vectors)
-        total_forces.index_add_(0, self.faces[:, 1], p2_forces_vectors)
-        
+        p2_forces_vectors = force_magnitudes_2 * (vec_n2 / h2)        
         p3_forces_vectors = p1_forces_vectors + p2_forces_vectors
         p3_forces_vectors = -p3_forces_vectors/2
 
+        total_forces.index_add_(0, self.faces[:, 0], p1_forces_vectors)
+        total_forces.index_add_(0, self.faces[:, 1], p2_forces_vectors)
         total_forces.index_add_(0, self.faces[:, 2], p3_forces_vectors)
         total_forces.index_add_(0, self.faces[:, 3], p3_forces_vectors)
+        
+        # damping force
+        point1velocity = self.velocities[self.lines[:, 0]]
+        point2velocity = self.velocities[self.lines[:, 1]]
+        damping_force =  2.0*self.damping*torch.sqrt(self.ea/self.rest_lengths) * (point2velocity - point1velocity)
+        total_forces.index_add_(0, self.lines[:, 0], damping_force)  
+        total_forces.index_add_(0, self.lines[:, 1], -damping_force) 
 
         accelerations = total_forces / self.masses
-        self.velocities += accelerations * dt
-        self.points += self.velocities * dt
+        self.velocities += accelerations * self.dt
+        self.points += self.velocities * self.dt
 
 
 
@@ -162,9 +159,9 @@ if __name__ == "__main__":
         fig.canvas.mpl_connect('close_event', on_close)
 
     start_time = time.time()
-    dt = 1.0/60.0
+
     for i in range(10000):
-        ori.step(dt)
+        ori.step()
         if VISUALIZE and i % 100 == 0:
             points = ori.points.cpu().numpy()
             lines = ori.lines.cpu().numpy()

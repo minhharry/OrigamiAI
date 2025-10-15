@@ -36,7 +36,7 @@ def main2():
     show_origami_object(o)
 
 def show_full():
-    IMAGE_PATH = "assets/airplane_output.svg"
+    IMAGE_PATH = "assets/M.svg"
     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
     listFaces = get_faces_from_points_lines(listPoints, listLines)
     o = OrigamiObject(listPoints, listLines, listFaces)

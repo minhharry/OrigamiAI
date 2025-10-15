@@ -56,18 +56,18 @@ def convert_to_matrix(listPoints: list[Point], listLines: list[Line], listFaces:
 
         tmp = []
 
-        if idx1 != face2.point1Index or idx2 != face2.point1Index:
+        if idx1 != face2.point1Index and idx2 != face2.point1Index:
             tmp.append(face2.point1Index)
-        elif idx1 != face2.point2Index or idx2 != face2.point2Index:
+        elif idx1 != face2.point2Index and idx2 != face2.point2Index:
             tmp.append(face2.point2Index)
-        elif idx1 != face2.point3Index or idx2 != face2.point3Index:
+        elif idx1 != face2.point3Index and idx2 != face2.point3Index:
             tmp.append(face2.point3Index)
         
-        if idx1 != face1.point1Index or idx2 != face1.point1Index:
+        if idx1 != face1.point1Index and idx2 != face1.point1Index:
             tmp.append(face1.point1Index)
-        elif idx1 != face1.point2Index or idx2 != face1.point2Index:
+        elif idx1 != face1.point2Index and idx2 != face1.point2Index:
             tmp.append(face1.point2Index)
-        elif idx1 != face1.point3Index or idx2 != face1.point3Index:
+        elif idx1 != face1.point3Index and idx2 != face1.point3Index:
             tmp.append(face1.point3Index)  
         tmp.append(idx1)
         tmp.append(idx2)
@@ -104,9 +104,8 @@ if VISUALIZE:
     fig.canvas.mpl_connect('close_event', on_close)
 
 start_time = time.time()
-dt = 1.0/60.0
 for i in range(10000):
-    ori.step(dt)
+    ori.step()
     if VISUALIZE and i % 100 == 0:
         points = ori.points.cpu().numpy()
         lines = ori.lines.cpu().numpy()
