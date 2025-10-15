@@ -31,6 +31,9 @@ class OrigamiObjectMatrix:
         self.k_crease = k_crease
         self.theta = torch.full((self.num_faces, 1), 0.0, device=self.device)
         self.target_theta = target_theta.to(self.device)
+        self.origin_length = torch.zeros_like(self.target_theta)
+        for i in range(self.num_faces):
+            self.origin_length[i] += torch.linalg.norm(self.points[self.faces[i, 0]] - self.points[self.faces[i, 1]])
 
         self.damping = damping
         self.velocities = torch.zeros_like(self.points)
@@ -103,7 +106,7 @@ class OrigamiObjectMatrix:
         theta = self.theta + diff
         self.theta = theta
 
-        force_magnitudes_2 = -self.k_crease * (theta - (self.target_theta))
+        force_magnitudes_2 = -self.k_crease * self.origin_length * (theta - (self.target_theta))
 
         p1_forces_vectors = force_magnitudes_2 * (vec_n1 / h1)
         p2_forces_vectors = force_magnitudes_2 * (vec_n2 / h2)

@@ -84,7 +84,11 @@ def convert_to_matrix(listPoints: list[Point], listLines: list[Line], listFaces:
 
 
 inputdict = convert_to_matrix(listPoints, listLines, listFaces)
-ori = OrigamiObjectMatrix(inputdict["points"], inputdict["lines"], inputdict["faces"], inputdict["target_thetas"])
+ori = OrigamiObjectMatrix(inputdict["points"]/100.0,
+                          inputdict["lines"],
+                          inputdict["faces"],
+                          inputdict["target_thetas"],
+                          )
 
 VISUALIZE = True
 if VISUALIZE:
@@ -103,7 +107,7 @@ start_time = time.time()
 dt = 1.0/60.0
 for i in range(10000):
     ori.step(dt)
-    if VISUALIZE and i % 1 == 0:
+    if VISUALIZE and i % 100 == 0:
         points = ori.points.cpu().numpy()
         lines = ori.lines.cpu().numpy()
         ax.clear()
@@ -115,9 +119,9 @@ for i in range(10000):
         # Draw points (vertices)
         ax.scatter(points[:, 0], points[:, 1], points[:, 2], c='r', marker='o', s=20) # type: ignore
 
-        ax.set_xlim([-100, 1300])
-        ax.set_ylim([-700, 700])
-        ax.set_zlim([-100, 1300])
+        ax.set_xlim([-1, 19])
+        ax.set_ylim([-10, 10])
+        ax.set_zlim([-1, 19])
         ax.set_xlabel('X'); ax.set_ylabel('Y'); ax.set_zlabel('Z')
         ax.set_title(f'(Frame {i})')
         
