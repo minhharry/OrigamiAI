@@ -2,12 +2,81 @@ import torch
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from object.origami_object import Point, Line, Face
 import time
 import math
 
 def dd(*x):
     if True:
         print("---- DEBUG: ", *x)
+
+def convert_to_matrix(listPoints: list[Point], listLines: list[Line], listFaces: list[Face]) -> dict:
+    pointTensors = []
+    for point in listPoints:
+        pointTensors.append(point.position)
+    resPoints = torch.stack(pointTensors)
+    lineIndices = []
+    for line in listLines:
+        lineIndices.append([line.p1Index, line.p2Index])
+    resLines = torch.tensor(lineIndices)
+    
+    mappingLineToFace = {}
+    for face in listFaces:
+        face.calculate_and_update_line_index(listLines)
+        if mappingLineToFace.get(face.line12Index) is None:
+            mappingLineToFace[face.line12Index] = []
+        if mappingLineToFace.get(face.line23Index) is None:
+            mappingLineToFace[face.line23Index] = []
+        if mappingLineToFace.get(face.line13Index) is None:
+            mappingLineToFace[face.line13Index] = []
+        mappingLineToFace[face.line12Index].append(face)
+        mappingLineToFace[face.line23Index].append(face)
+        mappingLineToFace[face.line13Index].append(face)
+    
+    resFaces = []
+    resTargetThetas = []
+    for lineIndex in range(len(listLines)):
+        if mappingLineToFace.get(lineIndex) is None:
+            continue
+        if len(mappingLineToFace[lineIndex]) != 2:
+            continue
+        face1: Face = mappingLineToFace[lineIndex][0]
+        face2: Face = mappingLineToFace[lineIndex][1]
+        idx1, idx2 = listLines[lineIndex].p1Index, listLines[lineIndex].p2Index
+        if idx1 == face1.point1Index and idx2 == face1.point2Index \
+           or idx1 == face1.point2Index and idx2 == face1.point3Index \
+           or idx1 == face1.point3Index and idx2 == face1.point1Index:
+            pass
+        else:
+            idx1, idx2 = idx2, idx1
+
+        tmp = []
+
+        if idx1 != face2.point1Index and idx2 != face2.point1Index:
+            tmp.append(face2.point1Index)
+        elif idx1 != face2.point2Index and idx2 != face2.point2Index:
+            tmp.append(face2.point2Index)
+        elif idx1 != face2.point3Index and idx2 != face2.point3Index:
+            tmp.append(face2.point3Index)
+        
+        if idx1 != face1.point1Index and idx2 != face1.point1Index:
+            tmp.append(face1.point1Index)
+        elif idx1 != face1.point2Index and idx2 != face1.point2Index:
+            tmp.append(face1.point2Index)
+        elif idx1 != face1.point3Index and idx2 != face1.point3Index:
+            tmp.append(face1.point3Index)  
+        tmp.append(idx1)
+        tmp.append(idx2)
+        resFaces.append(tmp)
+        resTargetThetas.append([listLines[lineIndex].targetTheta])
+    resFaces = torch.tensor(resFaces)
+    resTargetThetas = torch.tensor(resTargetThetas)
+    return {
+        "points": resPoints,
+        "lines": resLines,
+        "faces": resFaces,
+        "target_thetas": resTargetThetas,
+    }
 
 class OrigamiObjectMatrix:
     def __init__(self, points: torch.Tensor,
@@ -18,6 +87,7 @@ class OrigamiObjectMatrix:
                  ea: float = 20.0,
                  k_crease: float = 0.7,
                  damping: float = 0.45,
+                 fold_percent: float = 0.99,
                  dt: float = -1.0, # -1 means auto config 
                  device: str = 'cpu'):
         self.device = device
@@ -32,13 +102,14 @@ class OrigamiObjectMatrix:
         self.ea = ea
         self.k_crease = k_crease
         self.theta = torch.full((self.num_faces, 1), 0.0, device=self.device)
-        self.target_theta = (target_theta*0.9).to(self.device)
+        self.target_theta = (target_theta*fold_percent).to(self.device)
         self.origin_length = torch.zeros_like(self.target_theta)
         for i in range(self.num_faces):
             self.origin_length[i] += torch.linalg.norm(self.points[self.faces[i, 2]] - self.points[self.faces[i, 3]])
 
         self.damping = damping
         self.velocities = torch.zeros_like(self.points)
+        self.total_forces = torch.zeros_like(self.points) # Added for visualization
 
         p1 = self.points[self.lines[:, 0]]
         p2 = self.points[self.lines[:, 1]]
@@ -59,9 +130,9 @@ class OrigamiObjectMatrix:
         force_magnitudes = -self.ea / self.rest_lengths * displacements
         force_vectors = force_magnitudes * (spring_vectors / current_lengths)
 
-        total_forces = torch.zeros_like(self.points)
-        total_forces.index_add_(0, self.lines[:, 1], force_vectors)  # spring force
-        total_forces.index_add_(0, self.lines[:, 0], -force_vectors) # spring force
+        self.total_forces = torch.zeros_like(self.points) # Reset for each step
+        self.total_forces.index_add_(0, self.lines[:, 1], force_vectors)  # spring force
+        self.total_forces.index_add_(0, self.lines[:, 0], -force_vectors) # spring force
 
         # fold force
         p1 = self.points[self.faces[:, 0]]
@@ -105,19 +176,19 @@ class OrigamiObjectMatrix:
         p3_forces_vectors = p1_forces_vectors + p2_forces_vectors
         p3_forces_vectors = -p3_forces_vectors/2
 
-        total_forces.index_add_(0, self.faces[:, 0], p1_forces_vectors)
-        total_forces.index_add_(0, self.faces[:, 1], p2_forces_vectors)
-        total_forces.index_add_(0, self.faces[:, 2], p3_forces_vectors)
-        total_forces.index_add_(0, self.faces[:, 3], p3_forces_vectors)
+        self.total_forces.index_add_(0, self.faces[:, 0], p1_forces_vectors)
+        self.total_forces.index_add_(0, self.faces[:, 1], p2_forces_vectors)
+        self.total_forces.index_add_(0, self.faces[:, 2], p3_forces_vectors)
+        self.total_forces.index_add_(0, self.faces[:, 3], p3_forces_vectors)
         
         # damping force
         point1velocity = self.velocities[self.lines[:, 0]]
         point2velocity = self.velocities[self.lines[:, 1]]
         damping_force =  2.0*self.damping*torch.sqrt(self.ea/self.rest_lengths) * (point2velocity - point1velocity)
-        total_forces.index_add_(0, self.lines[:, 0], damping_force)  
-        total_forces.index_add_(0, self.lines[:, 1], -damping_force) 
+        self.total_forces.index_add_(0, self.lines[:, 0], damping_force)
+        self.total_forces.index_add_(0, self.lines[:, 1], -damping_force)
 
-        accelerations = total_forces / self.masses
+        accelerations = self.total_forces / self.masses
         self.velocities += accelerations * self.dt
         self.points += self.velocities * self.dt
 

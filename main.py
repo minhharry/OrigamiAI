@@ -3,8 +3,9 @@ from object.origami_object import OrigamiObject, Point, Line, Face, LineType
 from utils.get_points_line_from_svg import get_points_line_from_svg
 from utils.get_faces_from_points_lines import get_faces_from_points_lines
 from physic_engine.solver import solverStep, setDeltaTime
+from physic_engine.solver2 import OrigamiObjectMatrix, convert_to_matrix
 from visualization.animate_pointcloud import Plotter
-from visualization.animate import show_origami_object_open3d
+from visualization.animate import show_origami_object_open3d, show_origami_object_open3d_ori_matrix
 import time
 
 def main():
@@ -43,6 +44,20 @@ def show_full():
     setDeltaTime(o)
     # o.listPoints[0].is_fixed = True
     show_origami_object_open3d(o,solverStep,30,True,True,True,True,2)
+
+
+def show_full2():
+    IMAGE_PATH = "assets/M.svg"
+    listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
+    listFaces = get_faces_from_points_lines(listPoints, listLines)
+    inputdict = convert_to_matrix(listPoints, listLines, listFaces)
+    ori = OrigamiObjectMatrix(inputdict["points"]/100.0,
+                          inputdict["lines"],
+                          inputdict["faces"],
+                          inputdict["target_thetas"],
+                          )
+    # o.listPoints[0].is_fixed = True
+    show_origami_object_open3d_ori_matrix(ori,30,True,True,True,True,2)
 
 def main4():
     IMAGE_PATH = "assets/M.svg"
@@ -88,6 +103,7 @@ if __name__ == "__main__":
         'main': main,
         'main2': main2,
         'show_full': show_full,
+        'show_full2': show_full2,
         'main4': main4,
         'show_pointcloud': show_pointcloud,
         'benchmark': benchmark
