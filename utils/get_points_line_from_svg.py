@@ -165,7 +165,16 @@ def do_segments_intersect(p1, p2, q1, q2) -> bool:
         return (c[1]-a[1])*(b[0]-a[0]) > (b[1]-a[1])*(c[0]-a[0])
 
     if (p1 == q1).all() or (p1 == q2).all() or (p2 == q1).all() or (p2 == q2).all():
-        return False  # chia sẻ endpoint thì không tính là giao cắt
+        u1 = p1 - p2
+        u2 = q1 - q2
+        
+        alpha = np.acos(np.dot(u1, u2) / (np.linalg.norm(u1) * np.linalg.norm(u2)))
+        
+        if abs(alpha) < 0.01 or abs(alpha - np.pi) < 0.01:
+            return True 
+        else:
+            # Nếu chúng chung đầu mút nhưng KHÔNG thẳng hàng (ví dụ: hình chữ L)
+            return False
 
     return (ccw(p1, q1, q2) != ccw(p2, q1, q2)) and (ccw(p1, p2, q1) != ccw(p1, p2, q2))
 

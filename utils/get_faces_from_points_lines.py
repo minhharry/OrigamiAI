@@ -5,12 +5,15 @@ import torch
 def find_polygons(listPoints: list[Point], listLines: list[Line]) -> list[list[int]]:
     graph = [[] for _ in range(len(listPoints))]
     edges = set()
-    for line in listLines:
-        u, v = line.p1Index, line.p2Index
-        graph[u].append(v)
-        graph[v].append(u)
-        edges.add((min(u, v), max(u, v)))
-
+    try:
+        for line in listLines:
+            u, v = line.p1Index, line.p2Index
+            graph[u].append(v)
+            graph[v].append(u)
+            edges.add((min(u, v), max(u, v)))
+    except Exception as e:
+        print(e)
+   
     triangles = set()
 
     for u, v in edges:
@@ -28,7 +31,6 @@ def triangulate_polygon_to_faces(polygon: list[int], listPoints: list[Point]) ->
     faces = []
     if len(polygon) < 3:
         return faces
-
     p0 = polygon[0]
     for i in range(1, len(polygon) - 1):
         p1 = polygon[i]

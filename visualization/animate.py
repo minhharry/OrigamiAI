@@ -122,6 +122,7 @@ def show_origami_object_open3d(
             last_time = time.perf_counter()
 
             # --- run solver ---
+            # for i in range(10):
             solverstep(origami)
 
             # --- update points ---

@@ -179,12 +179,14 @@ def solverStep(objectOrigami: OrigamiObject) -> None:
     clear(objectOrigami)
 
     addAxialConstraintsForce(objectOrigami)
+    
     addCreaseConstraintsForce(objectOrigami)
+   
     addFaceConstraintsForce(objectOrigami)
    
     addDampingForce(objectOrigami)
     calculateVelocities(objectOrigami)
     calculateNewPositions(objectOrigami)
-
+  
     # objectOrigami.update_pointcloud_position()
     return
