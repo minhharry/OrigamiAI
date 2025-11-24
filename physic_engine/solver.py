@@ -1,6 +1,7 @@
 from object.origami_object import OrigamiObject, Face, Point, LineType
 import torch
 import math
+from torch import tensor
 # Solver
 # 1. Calculate face normals of all triangular faces in mesh (one face per thread).
 # 2. Calculate current fold angle for all edges in mesh (one edge per thread).
@@ -14,7 +15,7 @@ POINT_MASS = 1.0 # Mass of point
 DT = 0.01
 
 K_FOLD = 0.7
-K_FACET = 0.7
+K_FACET = 20
 
 K_FACE = 0.2
 
@@ -179,14 +180,12 @@ def solverStep(objectOrigami: OrigamiObject) -> None:
     clear(objectOrigami)
 
     addAxialConstraintsForce(objectOrigami)
-    
-    addCreaseConstraintsForce(objectOrigami)
-   
+    addCreaseConstraintsForce(objectOrigami)   
     addFaceConstraintsForce(objectOrigami)
-   
     addDampingForce(objectOrigami)
+    
     calculateVelocities(objectOrigami)
     calculateNewPositions(objectOrigami)
-  
+    
     # objectOrigami.update_pointcloud_position()
     return

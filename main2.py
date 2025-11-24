@@ -1,11 +1,16 @@
-from utils.get_points_line_from_svg import get_points_line_from_svg
+from utils.get_points_line_from_svg import get_points_line_from_svg, triangulate_all
 from utils.get_faces_from_points_lines import get_faces_from_points_lines
 from object.origami_object import OrigamiObject, Point, Line, Face, LineType
 from physic_engine.solver2 import OrigamiObjectMatrix
+from ptu.ptu import gen_ptu
+from ptu.ptu_board import gen_ptu_board
+from visualization.show_origami_object import show_origami_object_2d_new
+import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import time
 from visualization.animate import show_origami_object_open3d_obj
+import random
 
 IMAGE_PATH = "assets/M.svg"
 listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
@@ -99,128 +104,156 @@ def convert_to_obj(matrix: OrigamiObjectMatrix):
     return obj
 
 
-inputdict = convert_to_matrix(listPoints, listLines, listFaces)
-ori = OrigamiObjectMatrix(inputdict["points"]/100.0,
-                          inputdict["lines"],
-                          inputdict["faces"],
-                          inputdict["target_thetas"],
-                          )
+random.seed(4) #4
 
-VISUALIZE = True
-if VISUALIZE:
-    fig = plt.figure(figsize=(10, 10))
-    ax = fig.add_subplot(111, projection='3d')
-    plt.ion()
-    fig.show()
 
-    keep_running = True
-    def on_close(event):
-        global keep_running
-        keep_running = False
-    fig.canvas.mpl_connect('close_event', on_close)
+for i in range(1,10):
+    listPoints, listLines = gen_ptu_board(np.pi/i-0.01,10,0.5,True) # list[Point], list[Line], Line: {p1: Point, p2: Point, targetTheta: float}
+    listLines_ = []
+    # for i in range(len(listLines)):
+    #     print(listLines[i].p1,listLines[i].p2)
 
-import time
-import torch
-start_time = time.time()
-for i in range(10000):
-    ori.step()
-    # if VISUALIZE and i % 100 == 0:
-    #     # obj = convert_to_obj(ori)
-    #     # print(obj.listLines)
-    #     # print(obj.listPoints)
-    #     # show_origami_object_open3d_obj(obj)
-    #     points = ori.points.cpu().numpy()
-    #     lines = ori.lines.cpu().numpy()
-    #     ax.clear()
-    #     for line in lines:
-    #         p1 = points[line[0]]
-    #         p2 = points[line[1]]
-    #         ax.plot([p1[0], p2[0]], [p1[1], p2[1]], [p1[2], p2[2]], 'k-')
+    for i in range(len(listLines)):
+        p1_index = listPoints.index(listLines[i].p1)
+        p2_index = listPoints.index(listLines[i].p2)
+        targetTheta = torch.tensor(listLines[i].targetTheta) if listLines[i].targetTheta != -999 else torch.tensor(0.0)
+        lineType = LineType.VALLEY if targetTheta > 0 else LineType.MOUNTAIN
+        if listLines[i].targetTheta == -999: lineType = LineType.BORDER
+        listLines_.append(Line(p1_index,p2_index,lineType,targetTheta))
+    listPoints = [Point(x.position[0],x.position[2],x.position[1]) for x in listPoints]
+    
+    listFaces = get_faces_from_points_lines(listPoints, listLines_)
+    o = OrigamiObject(listPoints, listLines_, listFaces)
+    # show_origami_object_2d_new(o,True,True)
+    triangulate_all(listPoints,listLines_)
+    print("OK")
+    # triangulate_all(listPoints,listLines_)
+    # triangulate_all(listPoints,listLines_)
+    listFaces = get_faces_from_points_lines(listPoints, listLines_)
+    
 
-    #     # Draw points (vertices)
-    #     ax.scatter(points[:, 0], points[:, 1], points[:, 2], c='r', marker='o', s=20) # type: ignore
+    inputdict = convert_to_matrix(listPoints, listLines_, listFaces)
+    ori = OrigamiObjectMatrix(inputdict["points"]*5,
+                            inputdict["lines"],
+                            inputdict["faces"],
+                            inputdict["target_thetas"],
+                            )
 
-    #     # Draw faces
-    #     face1_indices = ori.faces[0, 3, 4].cpu().numpy()
-    #     face2_indices = ori.faces[1, 3, 4].cpu().numpy()
+    VISUALIZE = True
+    if VISUALIZE:
+        fig = plt.figure(figsize=(10, 10))
+        ax = fig.add_subplot(111, projection='3d')
+        plt.ion()
+        fig.show()
 
-    #     # Face 1 (pink)
-    #     face1_points = points[face1_indices]
-    #     ax.plot_trisurf(face1_points[:, 0], face1_points[:, 1], face1_points[:, 2], color='pink', alpha=0.5)
+        keep_running = True
+        def on_close(event):
+            global keep_running
+            keep_running = False
+        fig.canvas.mpl_connect('close_event', on_close)
 
-    #     # Face 2 (white)
-    #     face2_points = points[face2_indices]
-    #     ax.plot_trisurf(face2_points[:, 0], face2_points[:, 1], face2_points[:, 2], color='white', alpha=0.5)
+    import time
+    import torch
+    start_time = time.time()
+    for i in range(10000):
+        ori.step()
+        # if VISUALIZE and i % 100 == 0:
+        #     # obj = convert_to_obj(ori)
+        #     # print(obj.listLines)
+        #     # print(obj.listPoints)
+        #     # show_origami_object_open3d_obj(obj)
+        #     points = ori.points.cpu().numpy()
+        #     lines = ori.lines.cpu().numpy()
+        #     ax.clear()
+        #     for line in lines:
+        #         p1 = points[line[0]]
+        #         p2 = points[line[1]]
+        #         ax.plot([p1[0], p2[0]], [p1[1], p2[1]], [p1[2], p2[2]], 'k-')
 
-    #     ax.set_xlim([-1, 19])
-    #     ax.set_ylim([-10, 10])
-    #     ax.set_zlim([-1, 19])
-    #     ax.set_xlabel('X'); ax.set_ylabel('Y'); ax.set_zlabel('Z')
-    #     ax.set_title(f'(Frame {i})')
-        
-    #     fig.canvas.draw()
-    #     fig.canvas.flush_events()
-    #     # time.sleep(0.1)
-    #     if not keep_running:
-    #         break
+        #     # Draw points (vertices)
+        #     ax.scatter(points[:, 0], points[:, 1], points[:, 2], c='r', marker='o', s=20) # type: ignore
 
-    # Assuming 'fig', 'ax', 'ori', 'i', 'keep_running', 'VISUALIZE', and 'start_time' are defined elsewhere
+        #     # Draw faces
+        #     face1_indices = ori.faces[0, 3, 4].cpu().numpy()
+        #     face2_indices = ori.faces[1, 3, 4].cpu().numpy()
 
-    if VISUALIZE and i % 100 == 0:
-        # Clear the previous plot
-        ax.clear()
+        #     # Face 1 (pink)
+        #     face1_points = points[face1_indices]
+        #     ax.plot_trisurf(face1_points[:, 0], face1_points[:, 1], face1_points[:, 2], color='pink', alpha=0.5)
 
-        # Get points and lines
-        points = ori.points.cpu().numpy()
-        lines = ori.lines.cpu().numpy()
+        #     # Face 2 (white)
+        #     face2_points = points[face2_indices]
+        #     ax.plot_trisurf(face2_points[:, 0], face2_points[:, 1], face2_points[:, 2], color='white', alpha=0.5)
 
-        # Draw lines (edges)
-        for line in lines:
-            p1 = points[line[0]]
-            p2 = points[line[1]]
-            ax.plot([p1[0], p2[0]], [p1[1], p2[1]], [p1[2], p2[2]], 'k-')
+        #     ax.set_xlim([-1, 19])
+        #     ax.set_ylim([-10, 10])
+        #     ax.set_zlim([-1, 19])
+        #     ax.set_xlabel('X'); ax.set_ylabel('Y'); ax.set_zlabel('Z')
+        #     ax.set_title(f'(Frame {i})')
+            
+        #     fig.canvas.draw()
+        #     fig.canvas.flush_events()
+        #     # time.sleep(0.1)
+        #     if not keep_running:
+        #         break
 
-        # Draw points (vertices)
-        ax.scatter(points[:, 0], points[:, 1], points[:, 2], c='r', marker='o', s=20) # type: ignore
+        # Assuming 'fig', 'ax', 'ori', 'i', 'keep_running', 'VISUALIZE', and 'start_time' are defined elsewhere
 
-        # --- CORRECTED SECTION: Draw faces ---
-        # According to the structure, ori.faces[0] contains the definitions for two adjacent faces.
+        if VISUALIZE and i % 100 == 0:
+            # Clear the previous plot
+            ax.clear()
 
-        # Face 1 (pink) is created by vertices at indices ori.faces[0,0], ori.faces[0,2], ori.faces[0,3]
-        for face in ori.faces:
-            face1_indices = torch.tensor([
-                face[0], face[2], face[3]
-            ]).cpu().numpy()
+            # Get points and lines
+            points = ori.points.cpu().numpy()
+            lines = ori.lines.cpu().numpy()
 
-            # Face 2 (white) is created by vertices at indices ori.faces[0,1], ori.faces[0,2], ori.faces[0,3]
-            face2_indices = torch.tensor([
-                face[1], face[2], face[3]
-            ]).cpu().numpy()
+            # Draw lines (edges)
+            for line in lines:
+                p1 = points[line[0]]
+                p2 = points[line[1]]
+                ax.plot([p1[0], p2[0]], [p1[1], p2[1]], [p1[2], p2[2]], 'k-')
 
-            # Get the 3D coordinates for each face's vertices
-            face1_points = points[face1_indices]
-            face2_points = points[face2_indices]
+            # Draw points (vertices)
+            ax.scatter(points[:, 0], points[:, 1], points[:, 2], c='r', marker='o', s=20) # type: ignore
 
-            # Draw Face 1 (pink)
-            ax.plot_trisurf(face1_points[:, 0], face1_points[:, 1], face1_points[:, 2], color='pink', alpha=0.5)
+            # --- CORRECTED SECTION: Draw faces ---
+            # According to the structure, ori.faces[0] contains the definitions for two adjacent faces.
 
-            # Draw Face 2 (white)
-            ax.plot_trisurf(face2_points[:, 0], face2_points[:, 1], face2_points[:, 2], color='white', alpha=0.5)
-            # --- END OF CORRECTED SECTION ---
+            # Face 1 (pink) is created by vertices at indices ori.faces[0,0], ori.faces[0,2], ori.faces[0,3]
+            for face in ori.faces:
+                face1_indices = torch.tensor([
+                    face[0], face[2], face[3]
+                ]).cpu().numpy()
 
-        # Set plot limits and labels
-        ax.set_xlim([-1, 19])
-        ax.set_ylim([-10, 10])
-        ax.set_zlim([-1, 19])
-        ax.set_xlabel('X'); ax.set_ylabel('Y'); ax.set_zlabel('Z')
-        ax.set_title(f'(Frame {i})')
-        
-        # Update the plot window
-        fig.canvas.draw()
-        fig.canvas.flush_events()
-        
-        if not keep_running:
-            break
+                # Face 2 (white) is created by vertices at indices ori.faces[0,1], ori.faces[0,2], ori.faces[0,3]
+                face2_indices = torch.tensor([
+                    face[1], face[2], face[3]
+                ]).cpu().numpy()
+
+                # Get the 3D coordinates for each face's vertices
+                face1_points = points[face1_indices]
+                face2_points = points[face2_indices]
+
+                # Draw Face 1 (pink)
+                ax.plot_trisurf(face1_points[:, 0], face1_points[:, 1], face1_points[:, 2], color='pink', alpha=0.5)
+
+                # Draw Face 2 (white)
+                ax.plot_trisurf(face2_points[:, 0], face2_points[:, 1], face2_points[:, 2], color='white', alpha=0.5)
+                # --- END OF CORRECTED SECTION ---
+
+            # Set plot limits and labels
+            ax.set_xlim([-1, 19])
+            ax.set_ylim([-10, 10])
+            ax.set_zlim([-1, 19])
+            ax.set_xlabel('X'); ax.set_ylabel('Y'); ax.set_zlabel('Z')
+            ax.set_title(f'(Frame {i})')
+            
+            # Update the plot window
+            fig.canvas.draw()
+            fig.canvas.flush_events()
+            
+            if not keep_running:
+                break
 
 # dd('Run time: ', time.time() - start_time)
 dd('Run time: ', time.time() - start_time)

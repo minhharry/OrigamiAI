@@ -7,10 +7,11 @@ from physic_engine.solver2 import OrigamiObjectMatrix, convert_to_matrix
 from visualization.animate_pointcloud import Plotter
 from visualization.animate import show_origami_object_open3d
 from ptu.ptu import gen_ptu
+from ptu.ptu_board import gen_ptu_board
 import numpy as np
 import time
 import torch
-
+import random
 def main():
     IMAGE_PATH = "assets/M.svg"
     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
@@ -40,29 +41,46 @@ def main2():
     show_origami_object(o)
 
 def main_ptu():
-    listPoints, listLines = gen_ptu(np.pi-0.01,9,5) # list[Point], list[Line], Line: {p1: Point, p2: Point, targetTheta: float}
-    listLines_ = []
-    # for i in range(len(listLines)):
-    #     print(listLines[i].p1,listLines[i].p2)
+    random.seed(7) #4, 6
+    for i in range(2,3):
+        try:
+            listPoints, listLines = gen_ptu_board(np.pi/i-0.01,20,0.5,True) # list[Point], list[Line], Line: {p1: Point, p2: Point, targetTheta: float}
+       
+            listLines_ = []
+            # for i in range(len(listLines)):
+            #     print(listLines[i].p1,listLines[i].p2)
 
-    for i in range(len(listLines)):
-        p1_index = listPoints.index(listLines[i].p1)
-        p2_index = listPoints.index(listLines[i].p2)
-        targetTheta = torch.tensor(listLines[i].targetTheta) if listLines[i].targetTheta != -999 else torch.tensor(0.0)
-        lineType = LineType.VALLEY if targetTheta > 0 else LineType.MOUNTAIN
-        if listLines[i].targetTheta == -999: lineType = LineType.BORDER
-        listLines_.append(Line(p1_index,p2_index,lineType,targetTheta))
-    listPoints = [Point(x.position[0],x.position[2],x.position[1]) for x in listPoints]
-    
-    listFaces = get_faces_from_points_lines(listPoints, listLines_)
-    o = OrigamiObject(listPoints, listLines_, listFaces)
-    show_origami_object_2d_new(o,True,True)
-    triangulate_all(listPoints,listLines_)
-    
-    listFaces = get_faces_from_points_lines(listPoints, listLines_)
-    o = OrigamiObject(listPoints, listLines_, listFaces)
-    show_origami_object_2d_new(o,True,True)
-    show_origami_object_open3d(o,solverStep,30,True,True,True,True,2)
+            for i in range(len(listLines)):
+                p1_index = listPoints.index(listLines[i].p1)
+                p2_index = listPoints.index(listLines[i].p2)
+                targetTheta = torch.tensor(listLines[i].targetTheta) if listLines[i].targetTheta != -999 else torch.tensor(0.0)
+                lineType = LineType.VALLEY if targetTheta > 0 else LineType.MOUNTAIN
+                if listLines[i].targetTheta == -999: lineType = LineType.BORDER
+                listLines_.append(Line(p1_index,p2_index,lineType,targetTheta))
+            listPoints = [Point(x.position[0],x.position[2],x.position[1]) for x in listPoints]
+            
+            listFaces = get_faces_from_points_lines(listPoints, listLines_)
+            o = OrigamiObject(listPoints, listLines_, listFaces)
+            # show_origami_object_2d_new(o,True,True)
+            triangulate_all(listPoints,listLines_)
+            print("OK")
+            # triangulate_all(listPoints,listLines_)
+            # triangulate_all(listPoints,listLines_)
+            listFaces = get_faces_from_points_lines(listPoints, listLines_)
+            print("OK2")
+            o = OrigamiObject(listPoints, listLines_, listFaces)
+            print(len(o.listLines))
+            print(len(o.listPoints))
+            try:
+                show_origami_object_2d_new(o,True,True)
+            except Exception as e:
+                print(e)
+            try:
+                show_origami_object_open3d(o,solverStep,30,True,True,True,True,2)
+            except Exception as e:
+                print(e)
+        except Exception as e:
+            print(e)
 
 def show_full():
     IMAGE_PATH = "assets/M.svg"
@@ -125,6 +143,10 @@ def benchmark():
     print("time for 1000 steps of solverStep:", time.time() - start_time)
 
 if __name__ == "__main__":
+
+    a = [1,2,3,4,5,6,7,8,9,10]
+    print(a[0:5])
+    
     import argparse
     import sys
 

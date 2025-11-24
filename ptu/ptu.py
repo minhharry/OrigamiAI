@@ -3,12 +3,24 @@ import numpy as np
 import random
 from scipy.spatial import ConvexHull
 import math
+from enum import Enum
+import alphashape
+from shapely.geometry import Polygon, LineString, MultiLineString, Point as ShapelyPoint
+
 
 NUM_IN = [1,0,0]
 DEGREE = NUM_IN[0] + NUM_IN[1] + NUM_IN[2] + 3
 EPS = 1e-5
 GRID_SIZE = 10.0
 
+class Strategy(Enum):
+    RANDOM = 1
+    BFS = 2
+    DFS = 3
+    EVO = 4
+    PPO = 5
+
+ptu_strategy = Strategy.RANDOM
 
 class Point:
     def __init__(self, x: float, y: float, z: float, point_root: Point):
@@ -22,6 +34,11 @@ class Point:
 
 def gen_sector_angles(point: Point)->tuple[list[list[float]],list[list[float]]]:
     sector_angles = [[np.pi/2+EPS,np.pi/2-EPS],[np.pi/2+EPS],[np.pi/2-EPS]] 
+    angles1 = random.random()*np.pi*2
+    angles2 = random.random()*np.pi*2
+    angles3 = random.random()*np.pi*2
+    root = point.position+np.array([0,0,1])
+
     return sector_angles,  [[point.in_diheral_angles[0]],[],[]]
 
 class Line:
@@ -81,7 +98,7 @@ def calculate_theta(u1 ,u2 ,u3):
     theta2 = theta(u2,u1,u3)
     theta3 = theta(u3,u1,u2)
     return theta1, theta2, theta3
-   
+    
 def compute_folded_unit(alpha_arr,rho):
    p_0 = np.array([1,0,0])
    res = np.identity(3)    
@@ -167,8 +184,7 @@ def calc_ptu(sector_angles:list[list[float]],list_in_diheral_angles:list[list[fl
 
    calc(sector_angles,list_in_diheral_angles)
    M1, M2 = calc(sector_angles,list_in_diheral_angles)
-   print("M1:",M1)
-   print("M2:",M2)
+
    if M1 == [] or M2 == []:
        print("Error: M1 or M2 is empty")
        return [[],[],[]]
@@ -176,24 +192,17 @@ def calc_ptu(sector_angles:list[list[float]],list_in_diheral_angles:list[list[fl
    M2 = [float(M2[2]),float(M2[0]),float(M2[1])]
    t = [x for y in sector_angles for x in y]
    return [t, M1,M2]
-   diheral_angles1 = list_in_diheral_angles[0] + [float(M1[2])] + \
-                    list_in_diheral_angles[1] + [float(M1[0])] + \
-                    list_in_diheral_angles[2] + [float(M1[1])] 
-
-   diheral_angles2 = list_in_diheral_angles[0] + [float(M2[2])] + \
-                    list_in_diheral_angles[1] + [float(M2[0])] + \
-                    list_in_diheral_angles[2] + [float(M2[1])] 
-
-   M1 =  diheral_angles1
-   M2 = [x for y in sector_angles for x in y], diheral_angles2
-   return M1, M2
 
 def pick_up_point(boundary_points: list[Point]):
+    assert len(boundary_points) > 0, "error: boundary_points is empty!"
+    if ptu_strategy == Strategy.BFS:
+        return 0
+    elif ptu_strategy == Strategy.DFS:
+        return len(boundary_points)-1
     return random.randrange(0,len(boundary_points))
-from scipy.spatial import ConvexHull
 
-def connect_boundary_points(boundary_points: list[Point]) -> list[tuple[Point, Point]]:
-    if len(boundary_points) < 3:
+def connect_boundary_points(boundary_points: list[Point], list_lines: list[Line]) -> list[tuple[Point, Point]]:
+    if len(boundary_points) < 2:
         return []
     
     pts_2d = np.array([[p.position[0], p.position[1]] for p in boundary_points])
@@ -211,6 +220,48 @@ def connect_boundary_points(boundary_points: list[Point]) -> list[tuple[Point, P
 
     return boundary_lines
 
+# def connect_boundary_points(boundary_points: list[Point], list_current_lines: list[Line]):
+#     if len(boundary_points) < 3:
+#         return []
+#     for i in range(len(boundary_points)):
+#         print(boundary_points[i].position)
+#     for i in range(len(list_current_lines)):
+#         print(list_current_lines[i].p1.position,list_current_lines[i].p2.position)
+#     # Lấy tất cả các điểm có trong system (cả line và boundary)
+#     all_points = set(boundary_points)
+#     for line in list_current_lines:
+#         a, b = line.p1, line.p2
+#         all_points.add(a)
+#         all_points.add(b)
+#     pts_2d = np.array([[p.position[0], p.position[1]] for p in all_points])
+#     print("All points (for alpha shape):")
+#     for p in pts_2d:
+#         print(p)
+#     print("Number of points:", len(pts_2d))
+
+#     # Tạo alpha shape bao trùm toàn bộ điểm
+#     alpha = 2.0   # điều chỉnh: nhỏ quá thì cắt, lớn quá thì thành convex
+#     shape = alphashape.alphashape(pts_2d, alpha)
+#     print("shape ",shape)
+#     if not isinstance(shape, Polygon):
+#         return []
+
+#     coords = np.array(shape.exterior.coords[:-1])  # bỏ điểm lặp cuối
+
+#     # Lọc ra những Point nào nằm trên boundary thật
+#     boundary_lines = []
+#     ordered_points = []
+#     for coord in coords:
+#         p = min(boundary_points, key=lambda q: np.linalg.norm(np.array(q.position[:2]) - coord))
+#         ordered_points.append(p)
+
+#     # Tạo các cặp cạnh
+#     for i in range(len(ordered_points)):
+#         a = ordered_points[i]
+#         b = ordered_points[(i + 1) % len(ordered_points)]
+#         boundary_lines.append((a, b))
+
+#     return boundary_lines
 
 
 def check_intersection(list_points: list[Point], list_lines: list[tuple[Point,Point]], new_points: list[Point], v_i: Point ) -> bool:
@@ -218,19 +269,18 @@ def check_intersection(list_points: list[Point], list_lines: list[tuple[Point,Po
 # vi - vp = -s(vN+j − vi) + t(vq − vp)
     if len(list_points) <= 3:
         return False
-    list_lines_ :list[tuple[Point,Point]] = []
-    for i in range(len(list_lines)):
-        if list_lines[i][0] != v_i and list_lines[i][1] != v_i:
-            list_lines_.append(list_lines[i])
+    list_lines_ :list[tuple[Point,Point]] = list_lines.copy()
     for i in range(len(new_points)):
         v_i_2 = v_i.position[:2]
         v_N_j = new_points[i].position[:2]
+        print("================")
         s_vec = v_N_j - v_i_2 # vNj - vi            
         for j in range(len(list_lines_)):
             if list_lines_[j][0] == new_points[i] or list_lines_[j][1] == new_points[i]:
                 continue
             v_p = list_lines_[j][0].position[:2] 
             v_q = list_lines_[j][1].position[:2]
+            print("v_i ",v_i_2," v_N_j: ",v_N_j," v_p: ",v_p," v_q: ",v_q)
             t_vec = v_q - v_p
             A = np.column_stack((t_vec, -s_vec))
             b = v_i_2 - v_p
@@ -239,7 +289,24 @@ def check_intersection(list_points: list[Point], list_lines: list[tuple[Point,Po
                 continue 
 
             s, t = np.linalg.solve(A, b)
+            print("s: ",s," t ",t)
             if 0-EPS <= s <= 1+EPS and 0-EPS <= t <= 1+EPS:
+                intersec = v_p + s * t_vec
+                # check distance to all 4 endpoints
+                if (
+                    np.linalg.norm(intersec - v_p) < EPS*100 or
+                    np.linalg.norm(intersec - v_q) < EPS*100 or
+                    np.linalg.norm(intersec - v_i_2) < EPS*100 or
+                    np.linalg.norm(intersec - v_N_j) < EPS*100
+                ):
+                    u1 = v_i_2 - v_N_j
+                    u2 = v_p - v_q
+                    alpha = np.acos(np.dot(u1, u2) / (np.linalg.norm(u1) * np.linalg.norm(u2)))
+
+                    if abs(alpha) < 0.01 or abs(alpha - np.pi) < 0.01:
+                        return True 
+                    else:
+                        continue
                 return True
     return False
 
@@ -260,11 +327,10 @@ def sort_points_ccw(points: list[Point], data: list, center: Point):
         return math.atan2(dy, dx)
     
     paired_sorted = sorted(paired, key=angle)
-    
-    sorted_points, sorted_data = zip(*paired_sorted)
-    
+    sorted_points, sorted_data = zip(*paired_sorted)    
     return list(sorted_points), list(sorted_data)
-def check_merge_condition(points: list[Point], boundary_points: list[Point], v:Point ,merge_radius: float) -> tuple[bool, list[Point]]:
+
+def check_in_r(points: list[Point], boundary_points: list[Point], v:Point ,merge_radius: float) -> tuple[bool, list[Point]]:
     check_points = v
     list_merge_points = []
     for i in range(len(boundary_points)):
@@ -325,7 +391,6 @@ def create_points(root_point: Point, points: list[Point], sector_angles: list[li
     point1 = Point(p1[0],p1[1],p1[2],root_point)
     point2 = Point(p2[0],p2[1],p2[2],root_point)
     point3 = Point(p3[0],p3[1],p3[2],root_point)
-    print("list_diheral_angles:",list_diheral_angles)
     point1.in_diheral_angles = [list_diheral_angles[len(sector_angles[0])-1]]
     point2.in_diheral_angles = [list_diheral_angles[len(sector_angles[0])+len(sector_angles[1])-1]]
     point3.in_diheral_angles = [list_diheral_angles[len(sector_angles[0])+len(sector_angles[1])+len(sector_angles[2])-1]]
@@ -334,7 +399,7 @@ def create_points(root_point: Point, points: list[Point], sector_angles: list[li
 
 # tam thoi chi xet 1 nghiem
 # chua xu ly duyet xong con boundary thi lam gi, hinh vuong
-def gen_ptu(driving_angles:float,num_in: int, merge_radius: float) -> tuple[list[Point],list[Line]]:
+def gen_ptu(driving_angles:float,num_in: int, merge_radius: float, is_visualize = False) -> tuple[list[Point],list[Line]]:
     points:list[Point] = []
     # [Point(-GRID_SIZE/2.0,0.0,GRID_SIZE/2.0),
     #           Point(GRID_SIZE/2.0,0.0,GRID_SIZE/2.0),
@@ -342,8 +407,8 @@ def gen_ptu(driving_angles:float,num_in: int, merge_radius: float) -> tuple[list
     #           Point(-GRID_SIZE/2.0,0.0,-GRID_SIZE/2.0)]
     root_point = Point(-GRID_SIZE/2.0,0,0,None)
     points.append(root_point)
-    lines:list[Line] = [] 
-    boundary_points:list[Point] = [] 
+    lines:list[Line] = []
+    boundary_points:list[Point] = []
     # sinh ra 1 dinh tu root
     root_edge_len = 1
     init_point_position = np.dot(Rz(driving_angles),root_point.position)*root_edge_len
@@ -356,42 +421,42 @@ def gen_ptu(driving_angles:float,num_in: int, merge_radius: float) -> tuple[list
     num_loop = 0
     while len(points) < num_in and num_loop < 100:
         pickup_point = boundary_points[pick_up_point(boundary_points)]
-        can_merge , list_merge_points = check_merge_condition(points, boundary_points, pickup_point, merge_radius)
+        can_merge , list_merge_points = check_in_r(points, boundary_points, pickup_point, merge_radius)
         num_loop += 1
-        boundary_lines = connect_boundary_points(boundary_points+[root_point])
+        boundary_lines = connect_boundary_points(boundary_points+[root_point],lines)
         if can_merge:
-            # visualize(points,lines+[Line(x,y,-999) for x,y in boundary_lines])
+            visualize(points,lines+[Line(x,y,-999) for x,y in boundary_lines],is_visualize)
             merge_points(points, [(x.p1,x.p2) for x in lines], boundary_points, pickup_point, list_merge_points)
-            # visualize(points,lines+[Line(x,y,-999) for x,y in boundary_lines])
+            visualize(points,lines+[Line(x,y,-999) for x,y in boundary_lines],is_visualize)
             continue
         else:
             sector_angles, in_diheral_angles  = gen_sector_angles(pickup_point)
-            print(in_diheral_angles)
             sector_angles_, list_diheral_angles_1, list_diheral_angles_2 = calc_ptu(sector_angles,in_diheral_angles)
-            # print("pickup_point angles:",pickup_point,pickup_point.in_diheral_angles)
-            # print("list angles:",list_diheral_angles_1,list_diheral_angles_2)
+            
+            list_diheral_angles_1 = random.choice([list_diheral_angles_1,list_diheral_angles_2])
             if list_diheral_angles_1 != []:                
                 list_diheral_angles = in_diheral_angles[0] + [list_diheral_angles_1[0]] +\
                                         in_diheral_angles[1] + [list_diheral_angles_1[1]] +\
                                         in_diheral_angles[2] + [list_diheral_angles_1[2]]
                 p1,p2,p3 = create_points(pickup_point,points,sector_angles,list_diheral_angles)
-                # print("p1:",p1,p1.in_diheral_angles)
-                # print("p2:",p2,p2.in_diheral_angles) 
-                # print("p3:",p3,p3.in_diheral_angles)
+                
                 new_points = [p1,p2,p3]
                 temp_points = points + new_points
                 temp_lines = lines + [Line(pickup_point,temp_points[-3]),Line(pickup_point,temp_points[-2]),Line(pickup_point,temp_points[-1])]
                 temp_boundary_points = boundary_points.copy()
                 temp_boundary_points.remove(pickup_point)
-                boundary_lines = connect_boundary_points(temp_boundary_points+new_points+[root_point])
+                boundary_lines = connect_boundary_points(temp_boundary_points+new_points+[root_point],lines)
                 is_intersection = check_intersection(points,[(x.p1,x.p2) for x in lines]+boundary_lines,new_points,pickup_point)
-                # for i in range(len(temp_points)):
-                #     print(temp_points[i])
-                visualize(temp_points,temp_lines+[Line(x,y,-999) for x,y in boundary_lines])
+                visualize(temp_points,temp_lines+[Line(x,y,-999) for x,y in boundary_lines],is_visualize)
                 
                 if is_intersection:
                     continue
                 else:
+                    is_1_in_r,_ = check_in_r(points, points, p1, merge_radius)
+                    is_2_in_r,_ = check_in_r(points, points, p2, merge_radius)
+                    is_3_in_r,_ = check_in_r(points, points, p3, merge_radius)
+                    if is_1_in_r or is_2_in_r or is_3_in_r:
+                        continue
                     points.append(p1)
                     points.append(p2)
                     points.append(p3)
@@ -406,12 +471,14 @@ def gen_ptu(driving_angles:float,num_in: int, merge_radius: float) -> tuple[list
             else:
                 raise ValueError("Error: list_diheral_angles_1 is empty")
             # if list_diheral_angles_2 != []:
-    return points, lines +[Line(x,y,-999) for x,y in connect_boundary_points(boundary_points+[root_point])]
+    return points, lines +[Line(x,y,-999) for x,y in connect_boundary_points(boundary_points+[root_point],lines)]
             
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-def visualize(points, lines):
+def visualize(points, lines, is_visualize = False):
+    if not is_visualize:
+        return
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(111, projection='3d')
     
@@ -443,5 +510,81 @@ def visualize(points, lines):
     plt.show()
 
 
-points, lines = gen_ptu(np.pi-0.01,9,5)
+
+def gen_ptu_square(driving_angles:float, merge_radius: float, is_visualize = False) -> tuple[list[Point],list[Line]]:
+    points:list[Point] = []
+    # [Point(-GRID_SIZE/2.0,0.0,GRID_SIZE/2.0),
+    #           Point(GRID_SIZE/2.0,0.0,GRID_SIZE/2.0),
+    #           Point(GRID_SIZE/2.0,0.0,-GRID_SIZE/2.0),
+    #           Point(-GRID_SIZE/2.0,0.0,-GRID_SIZE/2.0)]
+    root_point = Point(-GRID_SIZE/2.0,0,0,None)
+    points.append(root_point)
+    lines:list[Line] = []
+    boundary_points:list[Point] = []
+    # sinh ra 1 dinh tu root
+    root_edge_len = 1
+    init_point_position = np.dot(Rz(driving_angles),root_point.position)*root_edge_len
+    init_point = Point(init_point_position[0],init_point_position[1],init_point_position[2],root_point)
+    points.append(init_point)
+    lines.append(Line(points[-1],points[-2],driving_angles))
+    boundary_points.append(points[-1])
+    init_point.point_root = [points[- 2]]
+    init_point.in_diheral_angles = [driving_angles]
+    num_loop = 0
+    while len(boundary_points) != 0:
+        pickup_point = boundary_points[pick_up_point(boundary_points)]
+        can_merge , list_merge_points = check_in_r(points, boundary_points, pickup_point, merge_radius)
+        num_loop += 1
+        boundary_lines = connect_boundary_points(boundary_points+[root_point],lines)
+        if can_merge:
+            visualize(points,lines+[Line(x,y,-999) for x,y in boundary_lines],is_visualize)
+            merge_points(points, [(x.p1,x.p2) for x in lines], boundary_points, pickup_point, list_merge_points)
+            visualize(points,lines+[Line(x,y,-999) for x,y in boundary_lines],is_visualize)
+            continue
+        else:
+            sector_angles, in_diheral_angles  = gen_sector_angles(pickup_point)
+            sector_angles_, list_diheral_angles_1, list_diheral_angles_2 = calc_ptu(sector_angles,in_diheral_angles)
+            
+            list_diheral_angles_1 = random.choice([list_diheral_angles_1,list_diheral_angles_2])
+            if list_diheral_angles_1 != []:                
+                list_diheral_angles = in_diheral_angles[0] + [list_diheral_angles_1[0]] +\
+                                        in_diheral_angles[1] + [list_diheral_angles_1[1]] +\
+                                        in_diheral_angles[2] + [list_diheral_angles_1[2]]
+                p1,p2,p3 = create_points(pickup_point,points,sector_angles,list_diheral_angles)
+                
+                new_points = [p1,p2,p3]
+                temp_points = points + new_points
+                temp_lines = lines + [Line(pickup_point,temp_points[-3]),Line(pickup_point,temp_points[-2]),Line(pickup_point,temp_points[-1])]
+                temp_boundary_points = boundary_points.copy()
+                temp_boundary_points.remove(pickup_point)
+                boundary_lines = connect_boundary_points(temp_boundary_points+new_points+[root_point],lines)
+                is_intersection = check_intersection(points,[(x.p1,x.p2) for x in lines]+boundary_lines,new_points,pickup_point)
+                visualize(temp_points,temp_lines+[Line(x,y,-999) for x,y in boundary_lines],is_visualize)
+                
+                if is_intersection:
+                    continue
+                else:
+                    is_1_in_r,_ = check_in_r(points, points, p1, merge_radius)
+                    is_2_in_r,_ = check_in_r(points, points, p2, merge_radius)
+                    is_3_in_r,_ = check_in_r(points, points, p3, merge_radius)
+                    if is_1_in_r or is_2_in_r or is_3_in_r:
+                        continue
+                    points.append(p1)
+                    points.append(p2)
+                    points.append(p3)
+               
+                    lines.append(Line(pickup_point,points[-3],list_diheral_angles_1[0]))
+                    lines.append(Line(pickup_point,points[-2],list_diheral_angles_1[1]))
+                    lines.append(Line(pickup_point,points[-1],list_diheral_angles_1[2]))
+                    boundary_points.remove(pickup_point)
+                    boundary_points.append(points[-3])
+                    boundary_points.append(points[-2])
+                    boundary_points.append(points[-1])
+            else:
+                raise ValueError("Error: list_diheral_angles_1 is empty")
+            # if list_diheral_angles_2 != []:
+    return points, lines +[Line(x,y,-999) for x,y in connect_boundary_points(boundary_points+[root_point],lines)]
+
+
+# points, lines = gen_ptu(np.pi-0.01,9,5)
 # visualize(points, lines)
