@@ -41,14 +41,14 @@ def main2():
     show_origami_object(o)
 
 def main_ptu():
-    random.seed(7) #4, 6
-    for i in range(2,3):
+    random.seed(7) #4, 6,7
+    print("main_ptu")
+    for i in range(2,10):
         try:
-            listPoints, listLines = gen_ptu_board(np.pi/i-0.01,20,0.5,True) # list[Point], list[Line], Line: {p1: Point, p2: Point, targetTheta: float}
-       
+            print("i:",i)
+            listPoints, listLines = gen_ptu_board(np.pi-0.01,12,0.5,True) # list[Point], list[Line], Line: {p1: Point, p2: Point, targetTheta: float}
+            print("listPoints:",len(listPoints))
             listLines_ = []
-            # for i in range(len(listLines)):
-            #     print(listLines[i].p1,listLines[i].p2)
 
             for i in range(len(listLines)):
                 p1_index = listPoints.index(listLines[i].p1)
@@ -61,24 +61,12 @@ def main_ptu():
             
             listFaces = get_faces_from_points_lines(listPoints, listLines_)
             o = OrigamiObject(listPoints, listLines_, listFaces)
-            # show_origami_object_2d_new(o,True,True)
+            show_origami_object_2d_new(o,True,True)
             triangulate_all(listPoints,listLines_)
-            print("OK")
-            # triangulate_all(listPoints,listLines_)
-            # triangulate_all(listPoints,listLines_)
             listFaces = get_faces_from_points_lines(listPoints, listLines_)
-            print("OK2")
             o = OrigamiObject(listPoints, listLines_, listFaces)
-            print(len(o.listLines))
-            print(len(o.listPoints))
-            try:
-                show_origami_object_2d_new(o,True,True)
-            except Exception as e:
-                print(e)
-            try:
-                show_origami_object_open3d(o,solverStep,30,True,True,True,True,2)
-            except Exception as e:
-                print(e)
+            # show_origami_object_2d_new(o,True,True)
+            # show_origami_object_open3d(o,solverStep,30,True,True,True,True,2)
         except Exception as e:
             print(e)
 
@@ -174,6 +162,7 @@ if __name__ == "__main__":
     try:
         mapping[args.function]()
 
-    except:
+    except Exception as e:
         print(f"Error: The function '{args.function}' was not found.")
+        print("Err",e)
         sys.exit(1)
