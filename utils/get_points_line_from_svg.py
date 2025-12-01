@@ -13,13 +13,55 @@ NAMESPACE = '{http://www.w3.org/2000/svg}'
 LINE_TAG = NAMESPACE + 'line'
 RECT_TAG = NAMESPACE + 'rect'
 
+def point_is_in_line(point , A, B) -> bool:
+    px, py = point
+    ax, ay = A
+    bx, by = B
+
+    cross = (bx - ax) * (py - ay) - (by - ay) * (px - ax)
+    if abs(cross) > 1e-6: 
+        return False
+
+    dot = (px - ax) * (px - bx) + (py - ay) * (py - by)
+    if dot > 0: 
+        return False
+
+    return True
 
 
-import torch
-import math
+def check_intersection_line(p1 , p2, q1, q2) -> bool:
+    
+    EPS = 1e-6
+    t_vec = q1 - q2
+    s_vec = p2 - p1
+    
+    A = np.column_stack((t_vec, -s_vec))
+    b = p1 - q2
+    det = np.linalg.det(A)
+    if abs(det) < 1e-6:
+        a1 = 1 if point_is_in_line(p1, q1, q2) else 0
+        a2 = 1 if point_is_in_line(p2, q1, q2) else 0
+        a3 = 1 if point_is_in_line(q1, p1, p2) else 0
+        a4 = 1 if point_is_in_line(q2, p1, p2) else 0
+        if a1 + a2 == 2 or a3 + a4 == 2:
+            return True
+        else:
+            return False
+        
+    s, t = np.linalg.solve(A, b)
+    if 0-EPS <= s <= 1+EPS and 0-EPS <= t <= 1+EPS:
+        a1 = 1 if point_is_in_line(p1, q1, q2) else 0
+        a2 = 1 if point_is_in_line(p2, q1, q2) else 0
+        a3 = 1 if point_is_in_line(q1, p1, p2) else 0
+        a4 = 1 if point_is_in_line(q2, p1, p2) else 0
+        if a1 + a2 == 2 or a3 + a4 == 2:
+            return True
+        elif a1 + a2 == 1:
+            return False
+        return True
+    return False
 
-import math
-from collections import defaultdict
+
 def find_polygons(points, lines):
     import math
     from collections import defaultdict
@@ -276,137 +318,7 @@ def do_segments_intersect(p1, p2, q1, q2) -> bool:
 
     return (ccw(p1, q1, q2) != ccw(p2, q1, q2)) and (ccw(p1, p2, q1) != ccw(p1, p2, q2))
 
-
-def triangluate_poly(listPoints: list[Point], listLines: list[Line]) -> list[Line]:
-    """
-    Từ listPoints sinh ra thêm các cạnh FACET bằng Delaunay.
-    Không đè lên cạnh có sẵn và không cắt biên polygon.
-    """
-
-    # chọn 2 chiều có biến thiên lớn nhất
-    arr = np.array([p.position.numpy() for p in listPoints])
-    ranges = arr.max(axis=0) - arr.min(axis=0)
-    idx = ranges.argsort()[-2:]
-    points_2d = arr[:, idx]
-
-    tri = Delaunay(points_2d)
-
-    # tập hợp cạnh từ simplex
-    edges = set()
-    for simplex in tri.simplices:
-        i, j, k = simplex
-        edges.add(tuple(sorted((i, j))))
-        edges.add(tuple(sorted((j, k))))
-        edges.add(tuple(sorted((k, i))))
-
-    # các cạnh có sẵn
-    existing_edges = {(min(l.p1Index, l.p2Index), max(l.p1Index, l.p2Index)) for l in listLines}
-    existing_segments = [(points_2d[i], points_2d[j]) for (i, j) in existing_edges]
-
-    new_lines = []
-    for i, j in edges:
-        if (i, j) in existing_edges:
-            continue  # bỏ qua cạnh đã có
-
-        pi, pj = points_2d[i], points_2d[j]
-
-        # kiểm tra cắt cạnh biên
-        intersects = False
-        for q1, q2 in existing_segments:
-            if do_segments_intersect(pi, pj, q1, q2):
-                intersects = True
-                break
-        if intersects:
-            continue
-        new_lines.append(Line(i, j, LineType.FACET, torch.tensor(0.0)))
-
-    return new_lines
-
-
-from shapely.geometry import LineString, Polygon
-from shapely.ops import polygonize, unary_union
-
-def calculate_polygon_area(listPoints: list[Point], listLines: list[Line], border_type_value=LineType.BORDER) -> float:
-    """
-    Tính diện tích đa giác dựa trên biên (boundary).
-    
-    Args:
-        listPoints: Danh sách các object Point.
-        listLines: Danh sách các object Line.
-        border_type_value: Giá trị của lineType quy định là đường biên (màu đen).
-                           Mặc định để là 1, bạn cần thay đổi tùy theo định nghĩa enum của bạn.
-    Returns:
-        Diện tích của đa giác.
-    """
-    
-    # BƯỚC 1: Xây dựng đồ thị liên kết chỉ gồm các cạnh biên
-    # Dictionary lưu các kết nối: {index_điểm: [các_index_hàng_xóm]}
-    adj = defaultdict(list)
-    
-    boundary_lines_count = 0
-    for line in listLines:
-        # Cần check xem lineType có phải là enum hay int, ở đây so sánh giá trị
-        if line.lineType == border_type_value:
-            u, v = line.p1Index, line.p2Index
-            adj[u].append(v)
-            adj[v].append(u)
-            boundary_lines_count += 1
-
-    if boundary_lines_count < 3:
-        print("Không đủ cạnh biên để tạo thành đa giác kín.")
-        return 0.0
-
-    # BƯỚC 2: Sắp xếp các đỉnh theo thứ tự vòng quanh (Graph Traversal)
-    # Bắt đầu từ một điểm bất kỳ có trong danh sách biên
-    start_node = list(adj.keys())[0]
-    ordered_indices = [start_node]
-    
-    curr = start_node
-    prev = -1 # Không có điểm trước đó cho điểm đầu tiên
-    
-    # Duyệt cho đến khi quay lại điểm đầu
-    while True:
-        neighbors = adj[curr]
-        
-        # Một đỉnh biên trong đa giác đơn phải có đúng 2 cạnh biên nối với nó
-        if len(neighbors) != 2:
-            print(f"Lỗi: Đỉnh {curr} không có đúng 2 cạnh biên (có {len(neighbors)}). Đồ thị không khép kín hoặc có lỗi.")
-            return 0.0
-        
-        # Tìm điểm tiếp theo (không phải là điểm vừa đi qua)
-        next_node = neighbors[0] if neighbors[0] != prev else neighbors[1]
-        
-        if next_node == start_node:
-            break # Đã khép kín vòng
-            
-        ordered_indices.append(next_node)
-        prev = curr
-        curr = next_node
-
-    # BƯỚC 3: Tính diện tích bằng công thức Shoelace (Shoelace Formula)
-    # Area = 0.5 * |sum(x_i * y_{i+1} - x_{i+1} * y_i)|
-    
-    area = 0.0
-    n = len(ordered_indices)
-    
-    # Lấy tọa độ X, Y (bỏ qua Z vì tính diện tích mặt phẳng origami)
-    # Chuyển sang list để truy xuất nhanh hoặc dùng tensor operation
-    coords = []
-    for idx in ordered_indices:
-        pos = listPoints[idx].position
-        coords.append((pos[0].item(), pos[1].item())) # Lấy x, y
-    print("has ",len(coords))
-    for i in range(n):
-        x_i, y_i = coords[i]
-        # Điểm tiếp theo (nếu là điểm cuối thì vòng về điểm đầu)
-        x_next, y_next = coords[(i + 1) % n]
-        
-        area += (x_i * y_next) - (x_next * y_i)
-        
-    return 0.5 * abs(area)
 def triangulate_polygons(listPoints: list, listLines: list, polygons: list[list[int]]) -> list:
-    import numpy as np
-    import torch
     EPS = 1e-9
 
     def to2d(pt):
@@ -430,20 +342,6 @@ def triangulate_polygons(listPoints: list, listLines: list, polygons: list[list[
         # check p on segment a-b (collinear assumed)
         return min(a[0], b[0]) - EPS <= p[0] <= max(a[0], b[0]) + EPS and \
                min(a[1], b[1]) - EPS <= p[1] <= max(a[1], b[1]) + EPS
-
-    def segments_intersect_strict(a,b,c,d):
-        # return True if segments ab and cd intersect (including collinear overlap)
-        o1 = orient(a,b,c)
-        o2 = orient(a,b,d)
-        o3 = orient(c,d,a)
-        o4 = orient(c,d,b)
-
-        if abs(o1) < EPS and on_segment(a,b,c): return True
-        if abs(o2) < EPS and on_segment(a,b,d): return True
-        if abs(o3) < EPS and on_segment(c,d,a): return True
-        if abs(o4) < EPS and on_segment(c,d,b): return True
-
-        return (o1>0 and o2<0 or o1<0 and o2>0) and (o3>0 and o4<0 or o3<0 and o4>0)
 
     def point_in_poly(pt, poly):
         # ray casting robust
@@ -469,7 +367,6 @@ def triangulate_polygons(listPoints: list, listLines: list, polygons: list[list[
         # allow on-edge
         return (o1 >= -EPS and o2 >= -EPS and o3 >= -EPS) or (o1 <= EPS and o2 <= EPS and o3 <= EPS)
 
-    # ---- main loop per polygon ----
     for poly_indices in polygons:
         m = len(poly_indices)
         if m < 3:
@@ -486,15 +383,9 @@ def triangulate_polygons(listPoints: list, listLines: list, polygons: list[list[
             signed_area += (x1*y2 - x2*y1)
         ccw = signed_area > 0  # True if CCW orientation
 
-        # working index list (local indices into pts2d / poly_indices)
         idxs = list(range(m))
         local_added = []
 
-        # quick access edges of polygon in local-index terms
-        def poly_edge_local(i):
-            return (idxs[i], idxs[(i+1)%len(idxs)])
-
-        # try ear clipping
         safe_guard = 0
         while len(idxs) > 3 and safe_guard < 5*m:
             safe_guard += 1
@@ -506,9 +397,7 @@ def triangulate_polygons(listPoints: list, listLines: list, polygons: list[list[
                 i_next = idxs[(k+1)%L]
 
                 A = pts2d[i_prev]; B = pts2d[i_curr]; C = pts2d[i_next]
-
                 cross = orient(A,B,C)
-                # convex test depends on orientation
                 if ccw:
                     if cross <= EPS:
                         continue
@@ -516,7 +405,6 @@ def triangulate_polygons(listPoints: list, listLines: list, polygons: list[list[
                     if cross >= -EPS:
                         continue
 
-                # no other vertex inside triangle
                 any_inside = False
                 for j in idxs:
                     if j in (i_prev, i_curr, i_next):
@@ -527,48 +415,38 @@ def triangulate_polygons(listPoints: list, listLines: list, polygons: list[list[
                 if any_inside:
                     continue
 
-                # prospective diagonal is (i_prev, i_next) in local indices
                 g1 = poly_indices[i_prev]
                 g2 = poly_indices[i_next]
-                # skip if diagonal equals existing polygon edge or global existing edge
                 if tuple(sorted((g1, g2))) in existing_edges:
-                    # if it's polygon boundary (adjacent in original polygon) it's allowed only if it's the boundary edge (shouldn't be)
                     pass
-
-                # check diagonal doesn't intersect polygon edges (except at endpoints)
+                
                 p1 = pts2d[i_prev]; p2 = pts2d[i_next]
                 intersects = False
                 for t in range(len(idxs)):
                     j1 = idxs[t]; j2 = idxs[(t+1)%len(idxs)]
-                    # skip edges touching at endpoints
-                    if j1 in (i_prev, i_next) or j2 in (i_prev, i_next):
-                        continue
+                    # if j1 in (i_prev, i_next) or j2 in (i_prev, i_next):
+                    #     continue
                     q1 = pts2d[j1]; q2 = pts2d[j2]
-                    if segments_intersect_strict(p1,p2,q1,q2):
+                    if check_intersection_line(p1,p2,q1,q2):
                         intersects = True
                         break
                 if intersects:
                     continue
 
-                # diagonal midpoint must be inside polygon (not outside)
                 mid = (p1 + p2) * 0.5
                 full_poly_xy = [pts2d[i] for i in range(len(pts2d))]
                 if not point_in_poly(mid, full_poly_xy):
                     continue
 
-                # good ear -> add diagonal as triangle edge between global indices
                 new_line = Line(int(g1), int(g2), LineType.FACET, torch.tensor(0.0))
                 local_added.append(new_line)
                 existing_edges.add(tuple(sorted((int(g1), int(g2)))))
 
-                # remove ear vertex (i_curr) from polygon
                 idxs.pop(k)
                 ear_found = True
                 break
 
             if not ear_found:
-                # no ear found -> possibly non-simple or numerical problem
-                # try fallback: pick any diagonal that does not intersect and whose midpoint inside
                 fallback_done = False
                 for a_local in range(len(idxs)):
                     for b_local in range(a_local+2, len(idxs)):
@@ -585,7 +463,7 @@ def triangulate_polygons(listPoints: list, listLines: list, polygons: list[list[
                             j1 = idxs[t]; j2 = idxs[(t+1)%len(idxs)]
                             if j1 in (i1,i2) or j2 in (i1,i2):
                                 continue
-                            if segments_intersect_strict(p1,p2, pts2d[j1], pts2d[j2]):
+                            if check_intersection_line(p1,p2, pts2d[j1], pts2d[j2]):
                                 intersects = True
                                 break
                         if intersects:
@@ -593,13 +471,9 @@ def triangulate_polygons(listPoints: list, listLines: list, polygons: list[list[
                         mid = (p1+p2)*0.5
                         if not point_in_poly(mid, [pts2d[i] for i in range(len(pts2d))]):
                             continue
-                        # accept fallback diagonal
                         new_line = Line(int(g1), int(g2), LineType.FACET, torch.tensor(0.0))
                         local_added.append(new_line)
                         existing_edges.add(tuple(sorted((int(g1), int(g2)))))
-                        # remove a vertex to reduce polygon size heuristically:
-                        # remove the vertex between a_local and b_local (choose middle)
-                        # here remove b_local (safe)
                         idxs.pop(b_local)
                         fallback_done = True
                         break
@@ -609,41 +483,18 @@ def triangulate_polygons(listPoints: list, listLines: list, polygons: list[list[
                 if not fallback_done:
                     print("Warning: cannot find non-crossing ear — polygon may be non-simple or numerically degenerate")
                     break
-
-        # at the end, idxs length should be 3; if >3 we failed; still accept local_added
         added_edges.extend(local_added)
 
     return added_edges
 
 def triangulate_all(listPoints: list[Point], listLines: list[Line]) -> list[Line]:
     init_listLines = listLines.copy()
-    # listLines_ = triangluate_poly(listPoints, listLines)
     
     polygons = find_polygons(listPoints, init_listLines)
     listLines_ = triangulate_polygons(listPoints, listLines, polygons)
-    
-    print("polygons:",len(polygons))
-    # for poly in polygons:
-    #     for i in range(len(poly)):
-    #         print(poly[i])
-    #     print("====")
-    # for line in listLines_:
-    #     print(line)
         
-    # for line in init_listLines:
-    #     if line.lineType == LineType.BORDER:
-    #         print(line)
-    # print("Area before: ",calculate_polygon_area(listPoints, init_listLines))
     for line in listLines_:
-        # if line.p1Index  in [0,1,2,3,4,5,6,7] and line.p2Index in [0,1,2,3,4,5,6,7]: continue
         listLines.append(line)
-    print("OKKOKO")
-    # print("Area after: ",calculate_polygon_area(listPoints, listLines))
-    # listLines.append(Line(0,1,LineType.BORDER,torch.tensor(0.0)))
-    # listLines.append(Line(1,2,LineType.BORDER,torch.tensor(0.0)))
-    # listLines.append(Line(2,3,LineType.BORDER,torch.tensor(0.0)))
-    # listLines.append(Line(3,0,LineType.BORDER,torch.tensor(0.0)))
-    # listLines.append(Line(3,1,LineType.BORDER,torch.tensor(0.0)))
 
     return listLines 
 

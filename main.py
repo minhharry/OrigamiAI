@@ -8,10 +8,14 @@ from visualization.animate_pointcloud import Plotter
 from visualization.animate import show_origami_object_open3d
 from ptu.ptu import gen_ptu
 from ptu.ptu_board import gen_ptu_board
+from utils.points_lines_to_svg import points_lines_to_svg
+from utils.save_3D_obj import save_obj
 import numpy as np
 import time
 import torch
 import random
+from datetime import datetime
+
 def main():
     IMAGE_PATH = "assets/M.svg"
     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
@@ -41,13 +45,14 @@ def main2():
     show_origami_object(o)
 
 def main_ptu():
-    random.seed(7) #4, 6,7
+    random.seed(0) #4, 6,7
     print("main_ptu")
     for i in range(2,10):
         try:
-            print("i:",i)
-            listPoints, listLines = gen_ptu_board(np.pi-0.01,12,0.5,True) # list[Point], list[Line], Line: {p1: Point, p2: Point, targetTheta: float}
-            print("listPoints:",len(listPoints))
+            # print("i:",i)
+            id = str(i)+datetime.now().strftime("%Y%m%d%H%M%S")
+            listPoints, listLines = gen_ptu_board(np.pi-0.01,9,0.5,id,False) # list[Point], list[Line], Line: {p1: Point, p2: Point, targetTheta: float}
+            # print("listPoints:",len(listPoints))
             listLines_ = []
 
             for i in range(len(listLines)):
@@ -60,13 +65,18 @@ def main_ptu():
             listPoints = [Point(x.position[0],x.position[2],x.position[1]) for x in listPoints]
             
             listFaces = get_faces_from_points_lines(listPoints, listLines_)
-            o = OrigamiObject(listPoints, listLines_, listFaces)
-            show_origami_object_2d_new(o,True,True)
+            # show_origami_object_2d_new(o,True,True)
             triangulate_all(listPoints,listLines_)
             listFaces = get_faces_from_points_lines(listPoints, listLines_)
+            points_lines_to_svg(listPoints,listLines_,100,f"output.svg",f"output/output_{id}")
+
             o = OrigamiObject(listPoints, listLines_, listFaces)
             # show_origami_object_2d_new(o,True,True)
             # show_origami_object_open3d(o,solverStep,30,True,True,True,True,2)
+            for i in range(3000):
+                solverStep(o)
+            # show_origami_object_open3d(o,solverStep,30,True,True,True,True,2)
+            save_obj(o.listPoints,o.listLines,o.listFaces,f"output.obj",f"output/output_{id}")
         except Exception as e:
             print(e)
 
@@ -87,21 +97,6 @@ def show_full():
     # o.listPoints[0].is_fixed = True
     show_origami_object_open3d(o,solverStep,30,True,True,True,True,2)
 
-
-# def show_full2():
-#     IMAGE_PATH = "assets/M.svg"
-#     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
-
-
-#     listFaces = get_faces_from_points_lines(listPoints, listLines)
-#     inputdict = convert_to_matrix(listPoints, listLines, listFaces)
-#     ori = OrigamiObjectMatrix(inputdict["points"]/100.0,
-#                           inputdict["lines"],
-#                           inputdict["faces"],
-#                           inputdict["target_thetas"],
-#                           )
-#     # o.listPoints[0].is_fixed = True
-#     show_origami_object_open3d_ori_matrix(ori,30,True,True,True,True,2)
 
 def main4():
     IMAGE_PATH = "assets/M.svg"

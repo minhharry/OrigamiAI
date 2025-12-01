@@ -4,6 +4,8 @@ from object.origami_object import OrigamiObject, Point, Line, Face, LineType
 from physic_engine.solver2 import OrigamiObjectMatrix
 from ptu.ptu import gen_ptu
 from ptu.ptu_board import gen_ptu_board
+from utils.points_lines_to_svg import points_lines_to_svg
+from utils.save_3D_obj import save_obj
 from visualization.show_origami_object import show_origami_object_2d_new
 import numpy as np
 import matplotlib.pyplot as plt
@@ -106,12 +108,9 @@ def convert_to_obj(matrix: OrigamiObjectMatrix):
 
 random.seed(4) #4
 
-
-for i in range(1,10):
-    listPoints, listLines = gen_ptu_board(np.pi/i-0.01,10,0.5,True) # list[Point], list[Line], Line: {p1: Point, p2: Point, targetTheta: float}
+for j in range(10):
+    listPoints, listLines = gen_ptu_board(np.pi-0.01,9,0.5,str(j),False) # list[Point], list[Line], Line: {p1: Point, p2: Point, targetTheta: float}
     listLines_ = []
-    # for i in range(len(listLines)):
-    #     print(listLines[i].p1,listLines[i].p2)
 
     for i in range(len(listLines)):
         p1_index = listPoints.index(listLines[i].p1)
@@ -123,15 +122,15 @@ for i in range(1,10):
     listPoints = [Point(x.position[0],x.position[2],x.position[1]) for x in listPoints]
     
     listFaces = get_faces_from_points_lines(listPoints, listLines_)
+    # show_origami_object_2d_new(o,True,True)
+    triangulate_all(listPoints,listLines_)
+    listFaces = get_faces_from_points_lines(listPoints, listLines_)
     o = OrigamiObject(listPoints, listLines_, listFaces)
     # show_origami_object_2d_new(o,True,True)
     triangulate_all(listPoints,listLines_)
-    print("OK")
-    # triangulate_all(listPoints,listLines_)
-    # triangulate_all(listPoints,listLines_)
-    listFaces = get_faces_from_points_lines(listPoints, listLines_)
+    print("OK")    
+    points_lines_to_svg(listPoints,listLines_,100,f"output.svg",f"output/output_{id}")
     
-
     inputdict = convert_to_matrix(listPoints, listLines_, listFaces)
     ori = OrigamiObjectMatrix(inputdict["points"]*5,
                             inputdict["lines"],
@@ -139,7 +138,7 @@ for i in range(1,10):
                             inputdict["target_thetas"],
                             )
 
-    VISUALIZE = True
+    VISUALIZE = False
     if VISUALIZE:
         fig = plt.figure(figsize=(10, 10))
         ax = fig.add_subplot(111, projection='3d')
@@ -254,6 +253,8 @@ for i in range(1,10):
             
             if not keep_running:
                 break
+    
+    # save_obj(ori.listPoints,ori.listLines,ori.faces,f"output.obj",f"output/output_{id}")
 
 # dd('Run time: ', time.time() - start_time)
 dd('Run time: ', time.time() - start_time)
