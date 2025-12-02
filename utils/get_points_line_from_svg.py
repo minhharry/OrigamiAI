@@ -255,6 +255,56 @@ def create_points_lines(root) -> tuple[list[Point], list[Line]]:
                     listPoints.append(intersectionPoint)
     return listPoints, listLines
 
+def create_points_lines_v2(root) -> tuple[list[Point], list[Line]]:
+    listPoints: list[Point] = []
+    listLines: list[Line] = []
+    has_border = False
+    for child in root:
+        if child.tag == LINE_TAG:
+            if get_type_line_from_svg(child)==LineType.BORDER:
+                has_border = True
+    for child in root:
+        if not has_border and child.tag == RECT_TAG:
+            listPoints.append(Point(float(child.attrib['x']),0.0,float(child.attrib['y'])))
+            listPoints.append(Point(float(child.attrib['x'])+float(child.attrib['width']),0.0,float(child.attrib['y'])))
+            listPoints.append(Point(float(child.attrib['x'])+float(child.attrib['width']),0.0,float(child.attrib['y'])+float(child.attrib['height'])))
+            listPoints.append(Point(float(child.attrib['x']),0.0,float(child.attrib['y'])+float(child.attrib['height'])))
+            listLines.append(Line(0, 1, LineType.BORDER))
+            listLines.append(Line(1, 2, LineType.BORDER))
+            listLines.append(Line(2, 3, LineType.BORDER))
+            listLines.append(Line(3, 0, LineType.BORDER))
+            has_border = True
+        if child.tag == LINE_TAG:
+            tempPoint1 = Point(float(child.attrib['x1']),0.0,float(child.attrib['y1']))
+            tempPoint2 = Point(float(child.attrib['x2']),0.0,float(child.attrib['y2']))
+            if not is_point_exist(tempPoint1, listPoints):
+                listPoints.append(tempPoint1)
+            if not is_point_exist(tempPoint2, listPoints):
+                listPoints.append(tempPoint2)
+            index1 = find_point_index(tempPoint1, listPoints)
+            index2 = find_point_index(tempPoint2, listPoints)
+            opacity = 1.0
+            if child.attrib.get('opacity'):
+                opacity = float(child.attrib.get('opacity')) 
+            elif child.attrib.get('stroke-opacity'):
+                opacity= float(child.attrib.get('stroke-opacity'))
+            targetTheta = 0
+            if (get_type_line_from_svg(child)==LineType.MOUNTAIN):
+                targetTheta = -opacity*math.pi
+            elif get_type_line_from_svg(child)==LineType.VALLEY:
+                targetTheta = opacity*math.pi
+            listLines.append(Line(index1, index2, get_type_line_from_svg(child),torch.tensor(targetTheta)))
+            if get_type_line_from_svg(child)==LineType.BORDER:
+                has_border = True
+        for i in range(len(listLines)):
+            for j in range(i+1, len(listLines)):
+                intersectionPoint = get_intersection_point(listPoints,listLines[i], listLines[j])
+                if intersectionPoint is not None and not is_point_exist(intersectionPoint, listPoints):
+                    listPoints.append(intersectionPoint)
+
+    return listPoints, listLines
+
+
 def break_lines(listPoints: list[Point], listLines: list[Line]) -> list[Line]:
 
     #break line if have point on line
@@ -276,7 +326,7 @@ def break_lines(listPoints: list[Point], listLines: list[Line]) -> list[Line]:
 
 def get_points_line_from_svg(svg_file_path: str) -> tuple[list[Point], list[Line]]:
     root = lxml.etree.parse(svg_file_path).getroot()
-    listPoints, listLines = create_points_lines(root) #get all points , include intersection points
+    listPoints, listLines = create_points_lines_v2(root) #get all points , include intersection points
     listLines = break_lines(listPoints, listLines) # break lines if have point on line
     triangulate_all(listPoints, listLines) # triangulate all polygon to facet lines
     return listPoints, listLines

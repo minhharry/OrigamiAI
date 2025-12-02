@@ -17,7 +17,7 @@ import random
 from datetime import datetime
 
 def main():
-    IMAGE_PATH = "assets/M.svg"
+    IMAGE_PATH = "output/output_920251201140220/output.svg"
     listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
     listFaces = get_faces_from_points_lines(listPoints, listLines)
     o = OrigamiObject(listPoints, listLines, listFaces)
@@ -45,13 +45,13 @@ def main2():
     show_origami_object(o)
 
 def main_ptu():
-    random.seed(0) #4, 6,7
+    random.seed(1) #4, 6,7
     print("main_ptu")
     for i in range(2,10):
         try:
             # print("i:",i)
             id = str(i)+datetime.now().strftime("%Y%m%d%H%M%S")
-            listPoints, listLines = gen_ptu_board(np.pi-0.01,9,0.5,id,False) # list[Point], list[Line], Line: {p1: Point, p2: Point, targetTheta: float}
+            listPoints, listLines = gen_ptu_board(np.pi-0.01,8,0.5,id,False) # list[Point], list[Line], Line: {p1: Point, p2: Point, targetTheta: float}
             # print("listPoints:",len(listPoints))
             listLines_ = []
 
@@ -64,17 +64,17 @@ def main_ptu():
                 listLines_.append(Line(p1_index,p2_index,lineType,targetTheta))
             listPoints = [Point(x.position[0],x.position[2],x.position[1]) for x in listPoints]
             
-            listFaces = get_faces_from_points_lines(listPoints, listLines_)
+            # listFaces = get_faces_from_points_lines(listPoints, listLines_)
             # show_origami_object_2d_new(o,True,True)
             triangulate_all(listPoints,listLines_)
             listFaces = get_faces_from_points_lines(listPoints, listLines_)
             points_lines_to_svg(listPoints,listLines_,100,f"output.svg",f"output/output_{id}")
 
             o = OrigamiObject(listPoints, listLines_, listFaces)
-            # show_origami_object_2d_new(o,True,True)
-            # show_origami_object_open3d(o,solverStep,30,True,True,True,True,2)
-            for i in range(3000):
-                solverStep(o)
+            show_origami_object_2d_new(o,True,True)
+            show_origami_object_open3d(o,solverStep,30,True,True,True,True,2)
+            # for i in range(3000):
+                # solverStep(o)
             # show_origami_object_open3d(o,solverStep,30,True,True,True,True,2)
             save_obj(o.listPoints,o.listLines,o.listFaces,f"output.obj",f"output/output_{id}")
         except Exception as e:
@@ -125,6 +125,15 @@ def benchmark():
         solverStep(o)
     print("time for 1000 steps of solverStep:", time.time() - start_time)
 
+def show_output():
+    IMAGE_PATH = "assets/flappingBird.svg"
+    listPoints, listLines = get_points_line_from_svg(IMAGE_PATH)
+    listFaces = get_faces_from_points_lines(listPoints, listLines)
+    o = OrigamiObject(listPoints, listLines, listFaces)
+    show_origami_object_2d_new(o,True,True)
+    show_origami_object_open3d(o,solverStep,30,True,True,True,True,2)
+
+
 if __name__ == "__main__":
 
     a = [1,2,3,4,5,6,7,8,9,10]
@@ -150,7 +159,8 @@ if __name__ == "__main__":
         # 'show_full2': show_full2,
         'main4': main4,
         'show_pointcloud': show_pointcloud,
-        'benchmark': benchmark
+        'benchmark': benchmark,
+        'show_output': show_output
     }
 
     # 4. Use the arguments in your script

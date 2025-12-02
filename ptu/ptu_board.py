@@ -94,7 +94,7 @@ def get_y_length():
     return BOARD_SIZE
 
 class Point:
-    def __init__(self, x: float, y: float, z: float, point_root: Point):
+    def __init__(self, x: float, y: float, z: float, point_root: Point = None):
         self.position = np.array([x,y,z])
         self.in_diheral_angles = []
         self.out_diheral_angles = []
@@ -102,6 +102,14 @@ class Point:
     
     def __str__(self):
         return f"Point({self.position[0]},{self.position[1]},{self.position[2]})"
+
+    def __eq__(self, other):
+        if not isinstance(other, Point): return False
+        return np.allclose(self.position, other.position, atol=1e-6)
+
+    def __hash__(self):
+        x,y,z = self.position
+        return hash((round(float(x),6), round(float(y),6), round(float(z),6)))
 
 class Line:
     def __init__(self, p1: Point, p2: Point, targetTheta: float = 0):
@@ -430,11 +438,13 @@ def check_intersection_line(line1: Line, line2: Line) -> bool:
             return False
         
     s, t = np.linalg.solve(A, b)
+    print("s,t:",s,t)
     if 0-EPS <= s <= 1+EPS and 0-EPS <= t <= 1+EPS:
         a1 = 1 if point_is_in_line(p1, (q1, q2)) else 0
         a2 = 1 if point_is_in_line(p2, (q1, q2)) else 0
         a3 = 1 if point_is_in_line(q1, (p1, p2)) else 0
         a4 = 1 if point_is_in_line(q2, (p1, p2)) else 0
+        print("a1,a2,a3,a4:",a1,a2,a3,a4)
         if a1 + a2 == 2 or a3 + a4 == 2:
             return True
         elif a1 + a2 == 1:
@@ -454,8 +464,7 @@ def connect_boundary_points_recursive(points: list[Point], boundary_points: list
     temp_lines = list_lines.copy()
     idx = 0
     while idx < len(posible_idx):
-        intersec = check_intersection_all_line(Line(boundary_points[order[start_idx]],boundary_points[order[posible_idx[idx]]],0),temp_lines)
-        
+        intersec = check_intersection_all_line(Line(boundary_points[order[start_idx]],boundary_points[order[posible_idx[idx]]],0),temp_lines)        
         if intersec:
             idx += 1
             if idx == len(posible_idx):
@@ -463,6 +472,23 @@ def connect_boundary_points_recursive(points: list[Point], boundary_points: list
             continue
         try:
             temp_lines.append(Line(boundary_points[order[start_idx]],boundary_points[order[posible_idx[idx]]],0))
+            polygons = find_polygons(temp_lines)
+            print("temp_lines:",len(temp_lines))
+            for i in temp_lines:
+                print(i.p1,i.p2)
+            print("polygons:",len(polygons))
+            for i in polygons:
+                print("===")
+                for j in i:
+                    print(j.p1,j.p2)
+            for i in boundary_points:
+                if is_in_polygons(i,polygons):
+                    idx += 1
+                    if idx == len(posible_idx):
+                        raise Exception()
+                    continue
+
+            visualize(points,temp_lines,True)
             picked = posible_idx[idx]
             posible_idx_new = posible_idx.copy()
             posible_idx_new.remove(picked)
@@ -706,17 +732,6 @@ def get_angle_2d(p_center: Point, p_neighbor: Point) -> float:
 # =====================================================================
 from collections import defaultdict
 def find_polygons(lines: list[Line]) -> list[list[Line]]:
-    """
-    Tìm tất cả các đa giác (faces) từ một danh sách các cạnh (Line).
-    Sử dụng thuật toán duyệt theo góc (angle-based traversal).
-    
-    Trả về: list[list[Line]]
-            Một danh sách các đa giác, mỗi đa giác là một danh sách các Line.
-    """
-    
-    # 1. Xây dựng danh sách kề và bản đồ cạnh
-    # adj_list: Point -> list[Point] (các hàng xóm)
-    # edge_map: (Point, Point) -> Line (để tra cứu Line object)
     adj_list = defaultdict(list)
     edge_map = {}
 
@@ -767,8 +782,9 @@ def find_polygons(lines: list[Line]) -> list[list[Line]]:
                 
                 # Lấy Line object và thêm vào đa giác hiện tại
                 current_line = edge_map[(prev_point, current_point)]
-                current_polygon_lines.append(current_line)
-
+                if current_line not in current_polygon_lines:
+                    current_polygon_lines.append(current_line)
+                
                 # Lấy danh sách hàng xóm ĐÃ SẮP XẾP của điểm hiện tại
                 sorted_neighbors = sorted_adj_list.get(current_point)
                 
@@ -1066,6 +1082,49 @@ def create_base_Y(points: list[Point], lines: list[Line], boundary_points: list[
     return points, boundary_points, lines
 
 
+def create_base_X_and_Y(points: list[Point], lines: list[Line], boundary_points: list[Point], driving_angles:float, board: np.ndarray) -> tuple[list[Point],list[Point],list[Line]]:
+    p1 = Point(0,0,0,None)
+    
+    p2 = Point(0,1,0,p1)
+    p3 = Point(1,0,0,p1)
+    p4 = Point(0,-1,0,p1)
+    p5 = Point(-1,0,0,p1)
+
+    points.append(p1)
+    points.append(p2)
+    points.append(p3)
+    points.append(p4)
+    points.append(p5)
+
+    p2.in_diheral_angles = [driving_angles]
+    p3.in_diheral_angles = [-driving_angles]
+    p4.in_diheral_angles = [-driving_angles]
+    p5.in_diheral_angles = [-driving_angles]
+
+    lines.append(Line(p1,p2,driving_angles))
+    lines.append(Line(p1,p3,-driving_angles))
+    lines.append(Line(p1,p4,-driving_angles))
+    lines.append(Line(p1,p5,-driving_angles))
+
+    x,y = position_revert(p1.position)
+    board[y][x] = 1
+    x,y = position_revert(p2.position)
+    board[y][x] = 1
+    x,y = position_revert(p3.position)
+    board[y][x] = 1
+    x,y = position_revert(p4.position)
+    board[y][x] = 1
+    x,y = position_revert(p5.position)
+    board[y][x] = 1
+    
+    boundary_points.append(p2)
+    boundary_points.append(p3)
+    boundary_points.append(p4)
+    boundary_points.append(p5)
+
+    return points, boundary_points, lines
+
+
 def position_revert(position: np.ndarray) -> np.ndarray:
     print("position",position)
     return np.array([position[0]+BOARD_SIZE//2,BOARD_SIZE//2-position[1]])
@@ -1210,7 +1269,7 @@ def gen_ptu_board(driving_angles:float,num_in: int, merge_radius: float,id: str,
     boundary_points = []
     board = np.zeros((BOARD_SIZE, BOARD_SIZE), dtype=int)
     print("OKOKO")
-    points, boundary_points, lines = create_base_Y(points, lines, boundary_points, driving_angles,board)
+    points, boundary_points, lines = create_base_X_and_Y(points, lines, boundary_points, driving_angles,board)
     print("points:",len(points))
     print("lines:",len(lines))
     print("boundary_points:",len(boundary_points))
@@ -1236,6 +1295,8 @@ def gen_ptu_board(driving_angles:float,num_in: int, merge_radius: float,id: str,
         temp_boundary_points.append(p1)
         temp_boundary_points.append(p2)
         temp_boundary_points.append(p3)
+        visualize(temp_points,temp_lines,True)
+
         temp_lines = temp_lines + [Line(x,y,-999) for x,y in connect_boundary_points(temp_points,temp_boundary_points,temp_lines)]
         is_valid_p = is_valid(pick_point,p1,p2,p3,temp_points, temp_boundary_points, temp_lines,board)
         temp_points = points.copy() + [p1,p2,p3]

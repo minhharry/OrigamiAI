@@ -1,6 +1,27 @@
-from object.origami_object import Point, Line, LineType, OrigamiObject, Face
+from object.origami_object import Point, Line, LineType, Face
 # from utils.get_points_line_from_svg import find_polygons
-import torch
+
+points = [
+    Point(0, 0, 0),
+    Point(0, 1, 0),
+    Point(1, 0, 0),
+    Point(0, -1, 0),
+    Point(-1, 0, 0),
+    Point(0, 3, 0),
+    Point(-4, -2, 0),
+    Point(4, -2, 0),
+]
+
+lines = [
+    Line(0, 1, LineType.MOUNTAIN),
+    Line(0, 2, LineType.MOUNTAIN),
+    Line(0, 3, LineType.MOUNTAIN),
+    Line(0, 4, LineType.MOUNTAIN),
+    Line(1, 5, LineType.MOUNTAIN),
+    Line(1, 6, LineType.MOUNTAIN),
+    Line(1, 7, LineType.MOUNTAIN),
+    Line(6, 3, LineType.MOUNTAIN),
+]
 
 def find_polygons(listPoints: list[Point], listLines: list[Line]) -> list[list[int]]:
     graph = [[] for _ in range(len(listPoints))]
@@ -57,3 +78,10 @@ def get_faces_from_points_lines(listPoints, listLines) -> list[Face]:
         faces = triangulate_polygon_to_faces(poly,listPoints)
         all_faces.extend(faces)
     return all_faces
+
+polygons = find_polygons(points, lines)
+print("polygons:",len(polygons))
+for poly in polygons:
+    for i in poly:
+        print(i)
+    print("===")

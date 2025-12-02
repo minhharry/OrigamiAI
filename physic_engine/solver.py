@@ -15,7 +15,7 @@ POINT_MASS = 1.0 # Mass of point
 DT = 0.01
 
 K_FOLD = 0.7
-K_FACET = 20
+K_FACET = 0.7
 
 K_FACE = 0.2
 
