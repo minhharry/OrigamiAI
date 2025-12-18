@@ -273,14 +273,12 @@ def check_intersection(list_points: list[Point], list_lines: list[tuple[Point,Po
     for i in range(len(new_points)):
         v_i_2 = v_i.position[:2]
         v_N_j = new_points[i].position[:2]
-        print("================")
         s_vec = v_N_j - v_i_2 # vNj - vi            
         for j in range(len(list_lines_)):
             if list_lines_[j][0] == new_points[i] or list_lines_[j][1] == new_points[i]:
                 continue
             v_p = list_lines_[j][0].position[:2] 
             v_q = list_lines_[j][1].position[:2]
-            print("v_i ",v_i_2," v_N_j: ",v_N_j," v_p: ",v_p," v_q: ",v_q)
             t_vec = v_q - v_p
             A = np.column_stack((t_vec, -s_vec))
             b = v_i_2 - v_p
@@ -289,7 +287,6 @@ def check_intersection(list_points: list[Point], list_lines: list[tuple[Point,Po
                 continue 
 
             s, t = np.linalg.solve(A, b)
-            print("s: ",s," t ",t)
             if 0-EPS <= s <= 1+EPS and 0-EPS <= t <= 1+EPS:
                 intersec = v_p + s * t_vec
                 # check distance to all 4 endpoints

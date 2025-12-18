@@ -12,8 +12,8 @@ def show_origami_object_open3d(
     fps: int = 30,
     show_points: bool = True,
     show_faces: bool = True,
-    show_forces: bool = True,
-    show_normals: bool = True,
+    show_forces: bool = False,
+    show_normals: bool = False,
     force_scale: float = 0.1,
     point_scale: float = 10.0,
     normal_scale: float = 0.2,
@@ -122,7 +122,7 @@ def show_origami_object_open3d(
             last_time = time.perf_counter()
 
             # --- run solver ---
-            for i in range(5):
+            for i in range(10):
                 solverstep(origami)
 
             # --- update points ---
@@ -269,7 +269,7 @@ def show_origami_object_open3d_obj(
     # --- render options ---
     render_option = vis.get_render_option()
     render_option.point_size = point_scale
-    print(origami.listPoints)
+    # print(origami.listPoints)
     def _pts_to_np(points):
         return np.array([[p.position[0].item(),
                           p.position[1].item(),
@@ -286,7 +286,7 @@ def show_origami_object_open3d_obj(
             np.tile(np.array([0.6, 0.0, 0.6], dtype=np.float64), (len(pts), 1))
         )
         vis.add_geometry(point_cloud)
-    print(">>>>>>>>",point_cloud)
+    # print(">>>>>>>>",point_cloud)
 
     # --- line setup ---
     line_color_map = {

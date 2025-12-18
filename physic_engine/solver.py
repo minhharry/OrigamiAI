@@ -178,7 +178,7 @@ def calculateNewPositions(objectOrigami: OrigamiObject) -> None:
 
 def solverStep(objectOrigami: OrigamiObject) -> None:
     clear(objectOrigami)
-
+    setDeltaTime(objectOrigami)
     addAxialConstraintsForce(objectOrigami)
     addCreaseConstraintsForce(objectOrigami)   
     addFaceConstraintsForce(objectOrigami)

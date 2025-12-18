@@ -6,10 +6,11 @@ from enum import Enum
 import json
 import os
 from datetime import datetime
+import zipfile
 NUM_IN = [1,0,0]
 DEGREE = NUM_IN[0] + NUM_IN[1] + NUM_IN[2] + 3
 EPS = 1e-5
-BOARD_SIZE = 15
+BOARD_SIZE = 11
 GRID_SIZE = BOARD_SIZE*2
 ACTIONS = []
 
@@ -94,7 +95,7 @@ def get_y_length():
     return BOARD_SIZE
 
 class Point:
-    def __init__(self, x: float, y: float, z: float, point_root: Point = None):
+    def __init__(self, x: float, y: float, z: float, point_root):
         self.position = np.array([x,y,z])
         self.in_diheral_angles = []
         self.out_diheral_angles = []
@@ -175,6 +176,7 @@ def calc_angles(root_point: Point, p1: Point, p2: Point, p3: Point) -> tuple[lis
         step = 1
         try:
             while True:
+                # print("calc")
                 if idx == not_include:
                     angles_seg = []
                     in_seg = []
@@ -203,7 +205,8 @@ def calc_angles(root_point: Point, p1: Point, p2: Point, p3: Point) -> tuple[lis
                     break
                 idx = next_idx
         except:
-            print("Error: sector_angles_ccw")
+            pass
+            # print("Error: sector_angles_ccw")
         return angles_seg, in_seg
     
     seg1_d, seg1_in = sector_angles_ccw(i3, i1, i2)
@@ -381,7 +384,7 @@ def calc(sector_angles:list[list[float]],list_in_diheral_angles:list[list[float]
     if (arr_u[0]+arr_u[1] - arr_u[2] > -0.01):
         pass
     else:
-        print("KHONG GAP DUOC DAU HEHE ====================")
+        # print("KHONG GAP DUOC DAU HEHE ====================")
         return [],[]
     
     M2:list[float] = [phi1,phi2,phi3]
@@ -389,14 +392,14 @@ def calc(sector_angles:list[list[float]],list_in_diheral_angles:list[list[float]
 
 def calc_ptu(sector_angles:list[list[float]],list_in_diheral_angles:list[list[float]]) -> list[list[float]]:
    if (not sector_angles or not list_in_diheral_angles):
-       print(len(sector_angles),len(list_in_diheral_angles))
-       print("Error: sector_angles or list_in_diheral_angles is empty")
+    #    print(len(sector_angles),len(list_in_diheral_angles))
+    #    print("Error: sector_angles or list_in_diheral_angles is empty")
        return [[],[],[]]
 
    M1, M2 = calc(sector_angles,list_in_diheral_angles)
 
    if M1 == [] or M2 == []:
-       print("Error: M1 or M2 is empty")
+    #    print("Error: M1 or M2 is empty")
        return [[],[],[]]
    M1 = [float(M1[2]),float(M1[0]),float(M1[1])]
    M2 = [float(M2[2]),float(M2[0]),float(M2[1])]
@@ -438,13 +441,11 @@ def check_intersection_line(line1: Line, line2: Line) -> bool:
             return False
         
     s, t = np.linalg.solve(A, b)
-    print("s,t:",s,t)
     if 0-EPS <= s <= 1+EPS and 0-EPS <= t <= 1+EPS:
         a1 = 1 if point_is_in_line(p1, (q1, q2)) else 0
         a2 = 1 if point_is_in_line(p2, (q1, q2)) else 0
         a3 = 1 if point_is_in_line(q1, (p1, p2)) else 0
         a4 = 1 if point_is_in_line(q2, (p1, p2)) else 0
-        print("a1,a2,a3,a4:",a1,a2,a3,a4)
         if a1 + a2 == 2 or a3 + a4 == 2:
             return True
         elif a1 + a2 == 1:
@@ -458,7 +459,7 @@ def check_intersection_all_line(line: Line, list_lines: list[Line]) -> bool:
             return True
     return False
 
-def connect_boundary_points_recursive(points: list[Point], boundary_points: list[Point], list_lines: list[Line],order: list, start_idx: int, posible_idx: list[int]) -> list[tuple[Point, Point]]:
+def connect_boundary_points_recursive(points: list[Point], boundary_points: list[Point], list_lines: list[Line],order, start_idx: int, posible_idx: list[int]) -> list[tuple[Point, Point]]:
     if start_idx == len(boundary_points):
         return []
     temp_lines = list_lines.copy()
@@ -473,14 +474,7 @@ def connect_boundary_points_recursive(points: list[Point], boundary_points: list
         try:
             temp_lines.append(Line(boundary_points[order[start_idx]],boundary_points[order[posible_idx[idx]]],0))
             polygons = find_polygons(temp_lines)
-            print("temp_lines:",len(temp_lines))
-            for i in temp_lines:
-                print(i.p1,i.p2)
-            print("polygons:",len(polygons))
-            for i in polygons:
-                print("===")
-                for j in i:
-                    print(j.p1,j.p2)
+         
             for i in boundary_points:
                 if is_in_polygons(i,polygons):
                     idx += 1
@@ -488,7 +482,7 @@ def connect_boundary_points_recursive(points: list[Point], boundary_points: list
                         raise Exception()
                     continue
 
-            visualize(points,temp_lines,True)
+            # visualize(points,temp_lines,is_visualize)
             picked = posible_idx[idx]
             posible_idx_new = posible_idx.copy()
             posible_idx_new.remove(picked)
@@ -516,7 +510,8 @@ def connect_boundary_points(points: list[Point], boundary_points: list[Point], l
     try:
         boundary_lines = connect_boundary_points_recursive(points,boundary_points,list_lines,order,0,[x for x in range(1,len(order))]+[0])
     except Exception as e:
-        print(e)
+        pass
+        # print(e)
 
     return boundary_lines
 
@@ -757,7 +752,7 @@ def find_polygons(lines: list[Line]) -> list[list[Line]]:
     # Dùng để theo dõi các cạnh *có hướng* đã đi qua
     visited_directed_edges = set() 
     polygons = []
-
+    int_max =  100
     for start_line in lines:
         # Mỗi cạnh phải được kiểm tra theo cả hai hướng, vì nó
         # là một phần của hai đa giác khác nhau (trừ khi ở biên)
@@ -777,6 +772,9 @@ def find_polygons(lines: list[Line]) -> list[list[Line]]:
             current_point = start_p2
             
             while True:
+                int_max -= 1
+                if int_max < 0:
+                    raise Exception("Error: find_polygons")
                 # Đánh dấu cạnh (có hướng) là đã duyệt
                 visited_directed_edges.add((prev_point, current_point))
                 
@@ -814,8 +812,6 @@ def is_valid_to_merge(points: list[Point], boundary_points: list[Point],exist_po
     temp_lines = lines.copy()
     if exist_points not in boundary_points:
         return False
-    print("is valid to merge",v)
-    print("exist_points:",exist_points)
     temp_lines = [ x for x in temp_lines if x.p1 is not v and x.p2 is not v]
     temp_lines.append(Line(v.point_root[0],exist_points,-999))
     
@@ -827,8 +823,6 @@ def is_valid_to_merge(points: list[Point], boundary_points: list[Point],exist_po
     return True
 
 def merge_points(points: list[Point], lines: list[Line], boundary_points: list[Point], v:Point, list_merge_points: list[Point]):
-    print("merge points",v)
-    print("list_merge_points:",list_merge_points[0])
     ACTIONS.append( {"action": Action.MERGE_POINT, "action_data": ActionData((v.position[0],v.position[1]), (list_merge_points[0].position[0],list_merge_points[0].position[1]))})
     merge_point = v
     for i in list_merge_points:
@@ -860,7 +854,7 @@ def merge_points(points: list[Point], lines: list[Line], boundary_points: list[P
 def create_points(root_point: Point, points: list[Point], sector_angles: list[list[float]], list_diheral_angles: list[float]) -> list[Point]:
 
     root_point = root_point
-    print("create points",root_point)
+    # print("create points",root_point)
     base_point = root_point.point_root[0]
     p_tuong_doi = base_point.position - root_point.position
     p1 = calc_p_j_m(p_tuong_doi,sector_angles[0][1:],list_diheral_angles)
@@ -1036,7 +1030,6 @@ def create_base(points: list[Point], lines: list[Line], boundary_points: list[Po
     board[y][x] = 1
     x,y = position_revert(p8.position)  
     board[y][x] = 1
-    print(board)
 
     # boundary_points.append(p1)
     # boundary_points.append(p2)
@@ -1126,12 +1119,10 @@ def create_base_X_and_Y(points: list[Point], lines: list[Line], boundary_points:
 
 
 def position_revert(position: np.ndarray) -> np.ndarray:
-    print("position",position)
     return np.array([position[0]+BOARD_SIZE//2,BOARD_SIZE//2-position[1]])
     
 def point_is_exist(points: list[Point], p: Point,board: np.ndarray) -> bool:
     x,y = position_revert(p.position)
-    print("x,y",x,y)
     return board[y][x] != 0
 
 def expand_point(points: list[Point], lines: list[Line], boundary_points: list[Point], p1: Point, root_point_sym: Point, diheral_angles_1: float, board: np.ndarray):
@@ -1151,14 +1142,11 @@ def expand_point(points: list[Point], lines: list[Line], boundary_points: list[P
     # elif SYMMETRIC_DIR == SymmetricStrategy.X_AND_Y:
     lines.append(Line(root_point_sym,new_ext_point,diheral_angles_1))
     new_ext_point.in_diheral_angles = [diheral_angles_1]
-    print("new_ext_point",new_ext_point)
-    print("expand point",p1)
     if point_is_exist(points,new_ext_point,board):
-        print("expand point",p1)
         is_valid_ = is_valid_to_merge(points,boundary_points, p1, new_ext_point, lines)
         exist_point = get_point_with_position(points,new_ext_point.position)
         if not is_valid_:
-            print("Error: ext_point is not valid")
+            # print("Error: ext_point is not valid")
             raise ValueError("Error: ext_point is not valid")
         merge_points(points, lines, boundary_points, exist_point, [new_ext_point])
         new_ext_point = exist_point
@@ -1198,7 +1186,7 @@ def expand_symmetric_X(points: list[Point], lines: list[Line], boundary_points: 
         
 def expand_symmetric_Y(points: list[Point], lines: list[Line], boundary_points: list[Point], pick_point: Point, p1: Point, p2: Point, p3: Point, list_diheral_angles_1: list[float],board: np.ndarray):
     global SYMMETRIC_DIR
-    print("expand_Y")
+    # print("expand_Y")
     if SYMMETRIC_DIR == SymmetricStrategy.No:
         return pick_point, p1, p2, p3, list_diheral_angles_1
     if is_on_symmetric(pick_point):
@@ -1247,7 +1235,7 @@ def expand_symmetric(points: list[Point], lines: list[Line], boundary_points: li
     
     return pick_point, p1, p2, p3, list_diheral_angles_1
 
-def store_output(data, file_name, folder_path = ""):
+def store_output(data, file_name, folder_path = "", is_zip = True):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
     if folder_path == "":
@@ -1261,160 +1249,175 @@ def store_output(data, file_name, folder_path = ""):
     with open(file_path, "w") as f:
         f.write(file_str)
 
-def gen_ptu_board(driving_angles:float,num_in: int, merge_radius: float,id: str, is_visualize = False) -> tuple[list[Point],list[Line]]:
+    if is_zip:
+        zip_path = file_path + ".zip"
+
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(file_path, arcname=file_name)
+
+        # Optional: remove original file after zipping
+        os.remove(file_path)
+
+        return zip_path
+
+    return file_path
+
+def gen_ptu_board(driving_angles:float,num_in: int, merge_radius: float,id: str, target_folder: str, is_visualize = False) -> tuple[list[Point],list[Line]]:
     points:list[Point] = []
     num_loop = 0
     points = []
     lines = []
     boundary_points = []
     board = np.zeros((BOARD_SIZE, BOARD_SIZE), dtype=int)
-    print("OKOKO")
-    points, boundary_points, lines = create_base_X_and_Y(points, lines, boundary_points, driving_angles,board)
-    print("points:",len(points))
-    print("lines:",len(lines))
-    print("boundary_points:",len(boundary_points))
+    # print("OKOKO")
+    points, boundary_points, lines = create_base_Y(points, lines, boundary_points, driving_angles,board)
     # try:
-    while len(points) < num_in and num_loop < 10000:
-        num_loop += 1
-        ACTIONS.append(
-            {
-                "action": Action.START
-            }
-        )
-        pick_point = boundary_points[pick_up_point(boundary_points)] 
-        p1,p2,p3 = pick_position(pick_point)
-        
-        p1 = Point(p1[0],p1[1],0,pick_point)
-        p2 = Point(p2[0],p2[1],0,pick_point)
-        p3 = Point(p3[0],p3[1],0,pick_point)
+    time_out = 60
+    while len(points) < num_in and num_loop < 1000:
+        if num_loop % 100 == 0:
+            print(f"num_loop: {num_loop}")
+        try:
+            num_loop += 1
+            ACTIONS.append(
+                {
+                    "action": Action.START
+                }
+            )
+            pick_point = boundary_points[pick_up_point(boundary_points)] 
+            p1,p2,p3 = pick_position(pick_point)
+            
+            p1 = Point(p1[0],p1[1],0,pick_point)
+            p2 = Point(p2[0],p2[1],0,pick_point)
+            p3 = Point(p3[0],p3[1],0,pick_point)
 
-        temp_points = points + [p1,p2,p3]
-        temp_lines = lines + [Line(pick_point,temp_points[-3]),Line(pick_point,temp_points[-2]),Line(pick_point,temp_points[-1])]
-        temp_boundary_points = boundary_points.copy()
-        temp_boundary_points.remove(pick_point)
-        temp_boundary_points.append(p1)
-        temp_boundary_points.append(p2)
-        temp_boundary_points.append(p3)
-        visualize(temp_points,temp_lines,True)
-
-        temp_lines = temp_lines + [Line(x,y,-999) for x,y in connect_boundary_points(temp_points,temp_boundary_points,temp_lines)]
-        is_valid_p = is_valid(pick_point,p1,p2,p3,temp_points, temp_boundary_points, temp_lines,board)
-        temp_points = points.copy() + [p1,p2,p3]
-        temp_lines = lines.copy() + [Line(pick_point,temp_points[-3]),Line(pick_point,temp_points[-2]),Line(pick_point,temp_points[-1])]
-        # visualize(temp_points,temp_lines,True)
-        if is_valid_p:
-            sector_angles, in_diheral_angles, p1, p2, p3  = calc_angles(pick_point,p1,p2,p3)
-            print("sector_angles: ", sector_angles, "\n driving angle: ", in_diheral_angles)
             temp_points = points + [p1,p2,p3]
             temp_lines = lines + [Line(pick_point,temp_points[-3]),Line(pick_point,temp_points[-2]),Line(pick_point,temp_points[-1])]
-
-            visualize(temp_points,temp_lines,is_visualize)
-
-            sector_angles_, list_diheral_angles_1, list_diheral_angles_2 = calc_ptu(sector_angles,in_diheral_angles)
-        
-            if list_diheral_angles_1 == []: 
-                continue
-            print("list_diheral_angles_1:",list_diheral_angles_1)
-            print("list_diheral_angles_2:",list_diheral_angles_2)
-            list_diheral_angles_1 = random.choice([list_diheral_angles_1,list_diheral_angles_2])
-            list_diheral_angles_1 = list_diheral_angles_2
-            print("selected list_diheral_angles:",list_diheral_angles_1)
-            temp_lines = lines.copy()
-            temp_points = points.copy()
             temp_boundary_points = boundary_points.copy()
             temp_boundary_points.remove(pick_point)
+            temp_boundary_points.append(p1)
+            temp_boundary_points.append(p2)
+            temp_boundary_points.append(p3)
+            # visualize(temp_points,temp_lines,True)
 
-            p1.in_diheral_angles = [list_diheral_angles_1[0]]
-            p2.in_diheral_angles = [list_diheral_angles_1[1]]
-            p3.in_diheral_angles = [list_diheral_angles_1[2]]
+            temp_lines = temp_lines + [Line(x,y,-999) for x,y in connect_boundary_points(temp_points,temp_boundary_points,temp_lines)]
+            is_valid_p = is_valid(pick_point,p1,p2,p3,temp_points, temp_boundary_points, temp_lines,board)
+            temp_points = points.copy() + [p1,p2,p3]
+            temp_lines = lines.copy() + [Line(pick_point,temp_points[-3]),Line(pick_point,temp_points[-2]),Line(pick_point,temp_points[-1])]
+            # visualize(temp_points,temp_lines,True)
+            if is_valid_p:
+                sector_angles, in_diheral_angles, p1, p2, p3  = calc_angles(pick_point,p1,p2,p3)
+                # print("sector_angles: ", sector_angles, "\n driving angle: ", in_diheral_angles)
+                temp_points = points + [p1,p2,p3]
+                temp_lines = lines + [Line(pick_point,temp_points[-3]),Line(pick_point,temp_points[-2]),Line(pick_point,temp_points[-1])]
 
-            temp_lines.append(Line(pick_point,p1,list_diheral_angles_1[0]))
-            temp_lines.append(Line(pick_point,p2,list_diheral_angles_1[1]))
-            temp_lines.append(Line(pick_point,p3,list_diheral_angles_1[2]))
-            temp_board = board.copy()
-            print("genboard")
-            # print("p1:",p1)
-            # print(temp_board)
-            if point_is_exist(temp_points,p1,temp_board):
-                exist_point = get_point_with_position(temp_points,p1.position)
-                if p1 == exist_point:
-                    print("p1 == exist_point")
-                if not is_valid_to_merge(temp_points,temp_boundary_points,exist_point,p1,temp_lines): continue
-                merge_points(temp_points, temp_lines, temp_boundary_points, exist_point, [p1])
-            else:
-                temp_boundary_points.append(p1)
-                temp_points.append(p1)
-                x,y = position_revert(p1.position)
-                temp_board[y][x] = 1
-            # print(temp_board)
-            # for i in range(len(temp_points)):
-                # print(i,temp_points[i])
-            if point_is_exist(temp_points,p2,temp_board):
-                exist_point = get_point_with_position(temp_points,p2.position)
-                if not is_valid_to_merge(temp_points,temp_boundary_points,exist_point,p2,temp_lines): continue
-                merge_points(temp_points, temp_lines, temp_boundary_points, exist_point , [p2])
-            else:
-                temp_boundary_points.append(p2)
-                temp_points.append(p2)
-                x,y = position_revert(p2.position)
-                temp_board[y][x] = 1
-            if point_is_exist(temp_points,p3,temp_board):
-                exist_point = get_point_with_position(temp_points,p3.position)
-                if is_valid_to_merge(temp_points,temp_boundary_points,exist_point,p3,temp_lines): continue
-                merge_points(temp_points, temp_lines, temp_boundary_points, exist_point , [p3])
-            else:
-                temp_boundary_points.append(p3)
-                temp_points.append(p3)
-                x,y = position_revert(p3.position)
-                temp_board[y][x] = 1
-            # print(temp_board)
-            # for i in range(len(temp_points)):
-                # print(i,temp_points[i])
-            # print("temp_board",temp_board)
-            # visualize(temp_points,temp_lines,is_visualize)
-            try:
-                expand_symmetric(temp_points,temp_lines,temp_boundary_points,pick_point,p1,p2,p3,list_diheral_angles_1,temp_board)
-                boundary_lines = connect_boundary_points(temp_points,temp_boundary_points,temp_lines)
-                if len(boundary_lines) < 3 and len(temp_boundary_points) > 2:
+                visualize(temp_points,temp_lines,is_visualize)
+
+                sector_angles_, list_diheral_angles_1, list_diheral_angles_2 = calc_ptu(sector_angles,in_diheral_angles)
+            
+                if list_diheral_angles_1 == []: 
+                    continue
+                list_diheral_angles_1 = random.choice([list_diheral_angles_1,list_diheral_angles_2])
+                list_diheral_angles_1 = list_diheral_angles_2
+                # print("selected list_diheral_angles:",list_diheral_angles_1)
+                temp_lines = lines.copy()
+                temp_points = points.copy()
+                temp_boundary_points = boundary_points.copy()
+                temp_boundary_points.remove(pick_point)
+
+                p1.in_diheral_angles = [list_diheral_angles_1[0]]
+                p2.in_diheral_angles = [list_diheral_angles_1[1]]
+                p3.in_diheral_angles = [list_diheral_angles_1[2]]
+
+                temp_lines.append(Line(pick_point,p1,list_diheral_angles_1[0]))
+                temp_lines.append(Line(pick_point,p2,list_diheral_angles_1[1]))
+                temp_lines.append(Line(pick_point,p3,list_diheral_angles_1[2]))
+                temp_board = board.copy()
+                # print("genboard")
+                # print("p1:",p1)
+                # print(temp_board)
+                if point_is_exist(temp_points,p1,temp_board):
+                    exist_point = get_point_with_position(temp_points,p1.position)
+                    if not is_valid_to_merge(temp_points,temp_boundary_points,exist_point,p1,temp_lines): continue
+                    merge_points(temp_points, temp_lines, temp_boundary_points, exist_point, [p1])
+                else:
+                    temp_boundary_points.append(p1)
+                    temp_points.append(p1)
+                    x,y = position_revert(p1.position)
+                    temp_board[y][x] = 1
+                # print(temp_board)
+                # for i in range(len(temp_points)):
+                    # print(i,temp_points[i])
+                if point_is_exist(temp_points,p2,temp_board):
+                    exist_point = get_point_with_position(temp_points,p2.position)
+                    if not is_valid_to_merge(temp_points,temp_boundary_points,exist_point,p2,temp_lines): continue
+                    merge_points(temp_points, temp_lines, temp_boundary_points, exist_point , [p2])
+                else:
+                    temp_boundary_points.append(p2)
+                    temp_points.append(p2)
+                    x,y = position_revert(p2.position)
+                    temp_board[y][x] = 1
+                if point_is_exist(temp_points,p3,temp_board):
+                    exist_point = get_point_with_position(temp_points,p3.position)
+                    if is_valid_to_merge(temp_points,temp_boundary_points,exist_point,p3,temp_lines): continue
+                    merge_points(temp_points, temp_lines, temp_boundary_points, exist_point , [p3])
+                else:
+                    temp_boundary_points.append(p3)
+                    temp_points.append(p3)
+                    x,y = position_revert(p3.position)
+                    temp_board[y][x] = 1
+                # print(temp_board)
+                # for i in range(len(temp_points)):
+                    # print(i,temp_points[i])
+                # print("temp_board",temp_board)
+                # visualize(temp_points,temp_lines,is_visualize)
+                try:
+                    expand_symmetric(temp_points,temp_lines,temp_boundary_points,pick_point,p1,p2,p3,list_diheral_angles_1,temp_board)
+                    boundary_lines = connect_boundary_points(temp_points,temp_boundary_points,temp_lines)
+                    if len(boundary_lines) < 3 and len(temp_boundary_points) > 2:
+                        ACTIONS.append(
+                            {
+                                "action": Action.DESTROY
+                            }
+                        )
+                        continue
+                    lines = temp_lines
+                    points = temp_points
+                    boundary_points = temp_boundary_points
+                    board = temp_board
+                except Exception as e:
+                    # print("Error: expand_symmetric:",e)
                     ACTIONS.append(
                         {
                             "action": Action.DESTROY
                         }
                     )
-                    continue
-                lines = temp_lines
-                points = temp_points
-                boundary_points = temp_boundary_points
-                board = temp_board
-            except Exception as e:
-                print("Error: expand_symmetric:",e)
+                    # print("points",i.position)
+                    # print("root_points",i.point_root)
+                    # print("in_diheral_angles",i.in_diheral_angles)
+                visualize(points,lines,is_visualize)
                 ACTIONS.append(
                     {
-                        "action": Action.DESTROY
+                        "action": Action.END_STEP
                     }
                 )
-            print("boundary points:",len(temp_boundary_points))
-            # for i in points:
-                # print("points",i.position)
-                # print("root_points",i.point_root)
-                # print("in_diheral_angles",i.in_diheral_angles)
-            visualize(points,lines,is_visualize)
-            ACTIONS.append(
-                {
-                    "action": Action.END_STEP
-                }
-            )
             
             # for i in range(len(lines)):
             #     print(lines[i].p1,lines[i].p2)
             # visualize(points,lines+[Line(x,y,-999) for x,y in boundary_lines],is_visualize)
 
+        except Exception as e:
+                    # print("Error: expand_symmetric:",e)
+                    ACTIONS.append(
+                        {
+                            "action": Action.DESTROY
+                        }
+                    )
     ACTIONS.append(
         {
             "action": Action.END
         }
     )
-    store_output(ACTIONS, f"actions.json",f"output/output_{id}")
+    store_output(ACTIONS, f"actions.json",f"{target_folder}output_{id}")
     return points, lines +[Line(x,y,-999) for x,y in connect_boundary_points(points,boundary_points,lines)]
             
 import matplotlib.pyplot as plt

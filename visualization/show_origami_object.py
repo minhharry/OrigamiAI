@@ -158,14 +158,14 @@ def show_origami_object_2d_new(origami: OrigamiObject, show_points: bool = True,
         # Đặt số ở giữa line
         mid_x = (x_values[0] + x_values[1]) / 2
         mid_y = (y_values[0] + y_values[1]) / 2
-        ax.text(mid_x, mid_y, str(i), color="green", fontsize=8)
+        # ax.text(mid_x, mid_y, str(i), color="green", fontsize=8)
 
     # Vẽ point và đánh số
     if show_points:
         for j, point in enumerate(listPoints):
             x, y = point.position[0].item(), point.position[2].item()
             ax.scatter(x, y, color="black", s=10)  # chấm đen nhỏ
-            ax.text(x + 0.001, y + 0.001, str(j), color="purple", fontsize=8)  # số hơi lệch để dễ nhìn
+            # ax.text(x + 0.001, y + 0.001, str(j), color="purple", fontsize=8)  # số hơi lệch để dễ nhìn
 
     ax.set_aspect('equal', adjustable='box')
     plt.gca().invert_yaxis()  # SVG gốc có trục y lộn ngược

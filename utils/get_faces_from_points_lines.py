@@ -80,8 +80,8 @@ def get_faces_from_points_lines(listPoints, listLines) -> list[Face]:
     return all_faces
 
 polygons = find_polygons(points, lines)
-print("polygons:",len(polygons))
-for poly in polygons:
-    for i in poly:
-        print(i)
-    print("===")
+# print("polygons:",len(polygons))
+# for poly in polygons:
+#     for i in poly:
+#         print(i)
+#     print("===")
